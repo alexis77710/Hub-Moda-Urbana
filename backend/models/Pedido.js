@@ -4,46 +4,31 @@
 const mongoose = require('mongoose');
 
 const PedidoSchema = mongoose.Schema({
-    // 1. ¿Quién compra? Enlazamos esto con el ID del cliente
     cliente: {
         type: mongoose.Schema.Types.ObjectId,
-        ref: 'Usuario', // Hace referencia a tu modelo Usuario.js
-        required: true
+        ref: 'Usuario',
+        required: false 
     },
-    // 2. ¿Qué compra? Es un arreglo porque puede llevar varias prendas
+    correoComprador: { type: String, required: true },
+    direccionEnvio: { type: String, required: true }, // Unificamos a un solo campo de dirección
+    telefonoComprador: { type: String, required: true },
+    
     productos: [
         {
             producto: {
                 type: mongoose.Schema.Types.ObjectId,
-                ref: 'Producto', // Hace referencia a tu modelo Producto.js
+                ref: 'Producto',
                 required: true
             },
-            cantidad: {
-                type: Number,
-                required: true,
-                default: 1
-            }
+            cantidad: { type: Number, required: true, default: 1 },
+            talla: { type: String, required: true }, // ¡NUEVO! Vital para ropa
+            precio: { type: Number, required: true } // ¡NUEVO! Historial del precio
         }
     ],
-    // 3. ¿A dónde se lo enviamos?
-    direccionEntrega: {
-        type: String,
-        required: true
-    },
-    // 4. ¿Cuánto costó todo?
-    total: {
-        type: Number,
-        required: true
-    },
-    // 5. ¿En qué estado está el envío?
-    estado: {
-        type: String,
-        default: 'Pendiente' // Puede ser: Pendiente, Pagado, Enviado, Entregado
-    },
-    fechaCreacion: {
-        type: Date,
-        default: Date.now
-    }
+    
+    total: { type: Number, required: true },
+    estado: { type: String, default: 'Pendiente' },
+    fechaCreacion: { type: Date, default: Date.now }
 });
 
 module.exports = mongoose.model('Pedido', PedidoSchema);

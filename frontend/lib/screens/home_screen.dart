@@ -3,7 +3,9 @@
 import 'product_detail_screen.dart';
 import 'package:flutter/material.dart';
 import '../services/product_service.dart'; // ¡Importamos el servicio!
-
+import 'package:provider/provider.dart';
+import '../services/cart_provider.dart';
+import 'cart_screen.dart';
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
 
@@ -58,9 +60,34 @@ class _HomeScreenState extends State<HomeScreen> {
         elevation: 0,
         foregroundColor: Colors.black,
         actions: [
-          IconButton(
-            icon: const Icon(Icons.shopping_bag_outlined),
-            onPressed: () => print('Ir al carrito'),
+          // Consumer "escucha" al CartProvider en tiempo real
+          Consumer<CartProvider>(
+            builder: (context, carrito, child) {
+              return Padding(
+                padding: const EdgeInsets.only(right: 15.0), // Separamos un poco del borde
+                child: Badge(
+                  // Solo mostramos el globito rojo si hay más de 0 cosas en el carrito
+                  isLabelVisible: carrito.cantidadTotal > 0,
+                  label: Text(
+                    carrito.cantidadTotal.toString(),
+                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                  ),
+                  backgroundColor: Colors.red,
+                 child: IconButton(
+                    icon: const Icon(Icons.shopping_bag_outlined, size: 28),
+                    onPressed: () {
+                      // Usamos Navigator para ir al carrito
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const CartScreen(),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              );
+            },
           )
         ],
       ),

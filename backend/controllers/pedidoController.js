@@ -4,18 +4,50 @@
 // Importamos el modelo de Pedido para poder crear nuevos pedidos y buscar los existentes
 const Pedido = require('../models/Pedido');
 
-// Función para crear un nuevo pedido
 exports.crearPedido = async (req, res) => {
     try {
-        // 1. Creamos un nuevo pedido con los datos que mande Postman/Flutter (productos y total)
-        const pedido = new Pedido(req.body);
+        const { productos, total, correoComprador, direccionEnvio, telefonoComprador } = req.body;
 
-        // 2. ¡EL TOQUE MAESTRO! 
-        // Asignamos el ID del cliente sacándolo del Pase VIP (Token)
-        // req.usuario.id es la información que nuestro guardia (middleware) ya validó
-        pedido.cliente = req.usuario.id;
+        const appToken = req.headers['x-app-source'];
+        if (appToken !== 'hub_moda_app_2026') {
+            return res.status(401).json({ msg: 'Petición rechazada, usa la app oficial bro 🛑' });
+        }
 
-        // 3. Guardamos el pedido en Mongo Atlas
+        if (!correoComprador || !direccionEnvio || !telefonoComprador) {
+            return res.status(400).json({ msg: 'Faltan datos de envío (correo, dirección o teléfono) 📦' });
+        }
+
+        // --- ¡EL BLINDAJE BACKEND (REGEX)! ---
+        
+        // 1. Regex de Correo: Exige texto + @ + texto + . + texto (Acepta .com, .ec, .edu.ec, etc)
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(correoComprador)) {
+            return res.status(400).json({ msg: 'El formato del correo es inválido bro, intenta de nuevo 🛑' });
+        }
+
+        // 2. Regex de Teléfono de Ecuador: Exige que empiece con 0 y tenga exactamente 10 números en total
+        const telefonoRegex = /^0\d{9}$/; 
+        if (!telefonoRegex.test(telefonoComprador)) {
+            return res.status(400).json({ msg: 'El teléfono debe tener 10 números y empezar con 0 bro 📱' });
+        }
+
+        // --- EL PARCHE MAESTRO ---
+        // Acomodamos los datos exactos que vienen de Flutter para que encajen en Mongoose
+        const productosMapeados = productos.map(item => ({
+            producto: item.productoId, // Flutter lo llama productoId, Mongoose lo llama producto
+            cantidad: item.cantidad,
+            talla: item.talla,
+            precio: item.precio
+        }));
+
+        const pedido = new Pedido({
+            productos: productosMapeados,
+            total,
+            correoComprador,
+            direccionEnvio,
+            telefonoComprador
+        });
+
         await pedido.save();
 
         res.status(201).json({ msg: '¡Pedido creado con éxito, mi bro! 🛒', pedido });
@@ -26,10 +58,8 @@ exports.crearPedido = async (req, res) => {
     }
 }
 
-// Función extra para que el cliente vea solo SUS pedidos cuando entre a la app
 exports.obtenerMisPedidos = async (req, res) => {
     try {
-        // Buscamos solo los pedidos donde el "cliente" sea exactamente igual al ID del Token
         const pedidos = await Pedido.find({ cliente: req.usuario.id });
         res.json(pedidos);
     } catch (error) {
