@@ -27,6 +27,7 @@ app.use('/api/productos', require('./routes/productoRoutes'));
 app.use('/api/auth', require('./routes/authRoutes'));
 // Agregamos la ruta de pedidos
 app.use('/api/pedidos', require('./routes/pedidoRoutes'));
+app.use('/api/marcas', require('./routes/marcas'));
 
 // Levantar el servidor
 app.listen(PORT, () => {

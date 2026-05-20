@@ -1,3 +1,4 @@
+// Archivo: backend/controllers/authController.js
 // aqui vamos a manejar todo lo relacionado con el registro y login de usuarios
 
 // Importamos el modelo de Usuario para poder crear nuevos usuarios y verificar los existentes
@@ -5,7 +6,7 @@ const Usuario = require("../models/Usuario");
 // Importamos bcrypt para encriptar las contraseñas y jwt para crear los Tokens de autenticación
 const bcrypt = require("bcryptjs");
 // 1. Importamos la librería para los Pases VIP
-const jwt = require("jsonwebtoken"); 
+const jwt = require("jsonwebtoken");
 
 // Función para registrar un nuevo usuario
 exports.registrarUsuario = async (req, res) => {
@@ -19,8 +20,8 @@ exports.registrarUsuario = async (req, res) => {
     // 2. Al menos una letra mayúscula (?=.*[A-Z])
     // 3. Al menos un número (?=.*\d)
     const passwordRegex = /^(?=.*[A-Z])(?=.*\d).{8,}$/;
-    
-// Si la contraseña no cumple con esta regla, le decimos al usuario que se ponga las pilas
+
+    // Si la contraseña no cumple con esta regla, le decimos al usuario que se ponga las pilas
     if (!passwordRegex.test(password)) {
       return res.status(400).json({
         msg: "Bro, la contraseña debe tener al menos 8 caracteres, una letra mayúscula y un número 🛑",
@@ -36,7 +37,10 @@ exports.registrarUsuario = async (req, res) => {
     }
 
     // 2. Si no existe, creamos el nuevo usuario con los datos del body
-    usuario = new Usuario(req.body);
+    usuario = new Usuario({
+      email,
+      password,
+    });
 
     // 3. ¡LA MAGIA DE LA ENCRIPTACIÓN!
     // Generamos un "salt" (un texto aleatorio para hacer el hash más seguro)

@@ -1,4 +1,9 @@
 // Archivo: lib/screens/login_screen.dart
+// Esta pantalla es para que los usuarios puedan iniciar sesión en el Hub de Moda Urbana. Aquí vamos a conectar con el 
+//AuthService que creamos para enviar las credenciales al backend y manejar la respuesta (token VIP o errores). 
+//También vamos a tener un botón para navegar a la pantalla de registro de usuarios,
+// y otro para que las marcas puedan ir a su propio formulario de registro.
+
 import 'package:flutter/material.dart';
 import '../services/auth_service.dart'; // ¡Importamos el nuevo puente!
 import 'brand_register_screen.dart'; // Esta es la pantalla de registro de marcas, que por ahora es un placeholder pero ya la tenemos lista para cuando empecemos a hacer el formulario de registro de marcas.
