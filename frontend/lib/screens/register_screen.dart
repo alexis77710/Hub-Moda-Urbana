@@ -1,6 +1,9 @@
 // Archivo: lib/screens/register_screen.dart
+// Esta pantalla es para que los clientes puedan crear su cuenta.
+// Archivo: lib/screens/register_screen.dart
 import 'package:flutter/material.dart';
-
+import '../services/auth_service.dart'; // <-- IMPORTAMOS EL SERVICIO
+import '../main_wrapper.dart'; // Añade esta línea arriba
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
 
@@ -14,9 +17,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final TextEditingController _passwordController = TextEditingController();
   
   bool _estaCargando = false;
+  final AuthService _authService = AuthService(); // <-- INSTANCIAMOS EL SERVICIO
 
-  void _intentarRegistro() {
-    // Validaciones básicas de la interfaz
+  Future<void> _intentarRegistro() async {
+    // 1. Validaciones básicas de la interfaz
     if (_nombreController.text.trim().isEmpty || 
         _emailController.text.trim().isEmpty || 
         _passwordController.text.isEmpty) {
@@ -30,24 +34,44 @@ class _RegisterScreenState extends State<RegisterScreen> {
       _estaCargando = true;
     });
 
-    // Simulamos un tiempo de carga (Aquí luego conectaremos tu Node.js en la ruta de registro)
-    Future.delayed(const Duration(seconds: 2), () {
+    try {
+      // 2. ¡LLAMADA REAL AL BACKEND!
+      await _authService.registrar(
+        _nombreController.text.trim(),
+        _emailController.text.trim(),
+        _passwordController.text,
+      );
+
       if (!mounted) return;
       
-      setState(() {
-        _estaCargando = false;
-      });
-
+      // 3. Éxito absoluto
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('¡Cuenta creada con éxito! Ya puedes iniciar sesión 🔥'),
+          content: Text('¡Cuenta creada y sesión iniciada! 🔥'),
           backgroundColor: Colors.green,
         ),
       );
 
-      // Regresamos al Login
-      Navigator.pop(context);
-    });
+      // 4. Lo mandamos directo al Home (MainWrapper) sin dejar que retroceda
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(builder: (context) => const MainWrapper()),
+        (Route<dynamic> route) => false,
+      );
+
+    } catch (e) {
+      if (!mounted) return;
+      // Si el backend se queja (ej. contraseña débil, correo repetido), mostramos el error
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.toString()), backgroundColor: Colors.red),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _estaCargando = false;
+        });
+      }
+    }
   }
 
   @override

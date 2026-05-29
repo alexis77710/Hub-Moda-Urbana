@@ -24,7 +24,6 @@ const productoSchema = new mongoose.Schema(
     },
     estilo: {
       type: String,
-      enum: ["Y2K", "skater", "minimalista", "vintage", "gorpcore"],
       required: true,
     },
     tallas: [

@@ -40,9 +40,36 @@ app.use(limiter);
 // ==========================================
 // Transformamos los datos entrantes en formato JSON (Crea el req.body)
 app.use(express.json()); 
+// Middleware personalizado para sanitizar NoSQL Injection
+const sanitizarDatos = (req, res, next) => {
+  const sanitizeObject = (obj) => {
+    if (obj && typeof obj === 'object') {
+      Object.keys(obj).forEach(key => {
+        // Si el key tiene un $, lo eliminamos (NoSQL Injection)
+        if (key.includes('$')) {
+          delete obj[key];
+        }
+        // Si el valor es un string con $, lo reemplazamos
+        if (typeof obj[key] === 'string') {
+          obj[key] = obj[key].replace(/\$/g, '_');
+        }
+        // Si es un objeto anidado, recursivo
+        if (typeof obj[key] === 'object') {
+          sanitizeObject(obj[key]);
+        }
+      });
+    }
+  };
 
-// ¡AHORA SÍ! Filtramos el req.body ya parseado para eliminar caracteres de inyección NoSQL ($)
-app.use(mongoSanitize());
+  // Solo sanitizamos body, no query
+  if (req.body) {
+    sanitizeObject(req.body);
+  }
+
+  next();
+};
+
+app.use(sanitizarDatos);
 
 // ==========================================
 //            RUTAS DE LA API REST

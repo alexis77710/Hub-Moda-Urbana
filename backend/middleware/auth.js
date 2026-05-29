@@ -1,10 +1,18 @@
-// middleware que se encarga de verificar el token JWT y el rol del usuario 
-// para proteger rutas específicas.
+// Archivo: middleware/auth.js
 const jwt = require('jsonwebtoken');
 
-// Guardia 1: Solo verifica que tengas un Token válido (Para comprar y ver perfil)
+// Función auxiliar para extraer el token sea como sea que venga
+const extraerToken = (req) => {
+    let token = req.header('x-auth-token'); // Como lo manda Postman a veces
+    if (!token && req.header('Authorization')) {
+        // Como lo manda Flutter (Authorization: Bearer <token>)
+        token = req.header('Authorization').replace('Bearer ', '');
+    }
+    return token;
+};
+
 exports.verificarToken = (req, res, next) => {
-    const token = req.header('x-auth-token');
+    const token = extraerToken(req);
     
     if (!token) {
         return res.status(401).json({ msg: 'No hay token bro, inicia sesión primero 🛑' });
@@ -19,9 +27,8 @@ exports.verificarToken = (req, res, next) => {
     }
 };
 
-// Guardia 2: Verifica Token Y que seas Marca (Para crear/borrar ropa)
 exports.verificarTokenYRol = (req, res, next) => {
-    const token = req.header('x-auth-token');
+    const token = extraerToken(req);
     
     if (!token) {
         return res.status(401).json({ msg: 'No hay token bro 🛑' });
@@ -31,7 +38,6 @@ exports.verificarTokenYRol = (req, res, next) => {
         const cifrado = jwt.verify(token, process.env.JWT_SECRET);
         req.usuario = cifrado.usuario;
 
-        // Aquí está la diferencia: este guardia SÍ filtra por rol
         if (req.usuario.rol !== 'marca' && req.usuario.rol !== 'admin') {
             return res.status(403).json({ msg: 'Solo marcas autorizadas pueden hacer esto 🛑' });
         }

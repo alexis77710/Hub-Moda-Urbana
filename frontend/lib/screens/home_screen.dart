@@ -1,11 +1,15 @@
 // Archivo: lib/screens/home_screen.dart
 // Esta es tu pantalla de inicio, donde se muestran los productos.
+// Archivo: lib/screens/home_screen.dart
 import 'product_detail_screen.dart';
 import 'package:flutter/material.dart';
-import '../services/product_service.dart'; // ¡Importamos el servicio!
+import '../services/product_service.dart'; 
+import '../services/auth_service.dart'; // Importamos el servicio de Auth para leer el rol
 import 'package:provider/provider.dart';
 import '../services/cart_provider.dart';
 import 'cart_screen.dart';
+import 'upload_product_screen.dart'; // Esta será tu nueva pantalla
+
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
 
@@ -14,20 +18,31 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  // Instanciamos nuestro servicio (como el constructor de Angular)
   final ProductService _productService = ProductService();
+  final AuthService _authService = AuthService(); // Instanciamos el servicio de Auth
 
   List<dynamic> productosReales = [];
   bool estaCargando = true;
   String? mensajeError;
+  String? miRol; // Aquí guardaremos si es 'cliente' o 'marca'
 
   @override
   void initState() {
     super.initState();
     cargarDatos();
+    cargarRolDelUsuario(); // Buscamos el rol apenas se abre la pantalla
   }
 
-  // Mira lo cortita y limpia que quedó esta función ahora 🤩
+  // --- LA FUNCIÓN QUE PREGUNTA EL ROL ---
+  Future<void> cargarRolDelUsuario() async {
+    String? rolGuardado = await _authService.obtenerRolGuardado();
+    if (mounted) {
+      setState(() {
+        miRol = rolGuardado;
+      });
+    }
+  }
+
   Future<void> cargarDatos() async {
     try {
       final data = await _productService.obtenerRopa();
@@ -60,23 +75,20 @@ class _HomeScreenState extends State<HomeScreen> {
         elevation: 0,
         foregroundColor: Colors.black,
         actions: [
-          // Consumer "escucha" al CartProvider en tiempo real
           Consumer<CartProvider>(
             builder: (context, carrito, child) {
               return Padding(
-                padding: const EdgeInsets.only(right: 15.0), // Separamos un poco del borde
+                padding: const EdgeInsets.only(right: 15.0),
                 child: Badge(
-                  // Solo mostramos el globito rojo si hay más de 0 cosas en el carrito
                   isLabelVisible: carrito.cantidadTotal > 0,
                   label: Text(
                     carrito.cantidadTotal.toString(),
                     style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
                   ),
                   backgroundColor: Colors.red,
-                 child: IconButton(
+                  child: IconButton(
                     icon: const Icon(Icons.shopping_bag_outlined, size: 28),
                     onPressed: () {
-                      // Usamos Navigator para ir al carrito
                       Navigator.push(
                         context,
                         MaterialPageRoute(
@@ -91,6 +103,25 @@ class _HomeScreenState extends State<HomeScreen> {
           )
         ],
       ),
+      
+      // --- LA MAGIA: EL BOTÓN CONDICIONAL ---
+      // Solo aparece si miRol es exactamente 'marca' o 'admin'
+      floatingActionButton: (miRol == 'marca' || miRol == 'admin') 
+        ? FloatingActionButton(
+            backgroundColor: Colors.black,
+            child: const Icon(Icons.add_a_photo, color: Colors.white),
+            onPressed: () {
+              // Viajamos a la pantalla de subir producto (la crearemos después)
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const UploadProductScreen(),
+                ),
+              );
+            },
+          )
+        : null, // Si es un cliente normal, el botón no existe.
+
       body: estaCargando
           ? const Center(child: CircularProgressIndicator(color: Colors.black))
           : mensajeError != null
@@ -114,7 +145,6 @@ class _HomeScreenState extends State<HomeScreen> {
                       itemBuilder: (context, index) {
                         final producto = productosReales[index];
                         
-                        // Parche inteligente para la imagen
                         String urlImagen = 'https://via.placeholder.com/150';
                         var campoImagen = producto['imagenes']; 
                         if (campoImagen != null) {
@@ -125,10 +155,8 @@ class _HomeScreenState extends State<HomeScreen> {
                           }
                         }
 
-                        // Envolvemos la tarjeta en un detector de gestos
                         return GestureDetector(
                           onTap: () {
-                            // Cuando lo tocan, navegamos a la pantalla de detalles y le pasamos el producto
                             Navigator.push(
                               context,
                               MaterialPageRoute(

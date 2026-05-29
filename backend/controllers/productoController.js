@@ -2,7 +2,7 @@
 // mostrar los productos, actualizar o eliminar un producto
 
 const Producto = require("../models/Producto");
-
+const Marca = require("../models/Marca");
 
 // Función para agregar un producto nuevo
 exports.crearProducto = async (req, res) => {

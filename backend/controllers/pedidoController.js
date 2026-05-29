@@ -3,7 +3,8 @@
 
 // Importamos el modelo de Pedido para poder crear nuevos pedidos y buscar los existentes
 const Pedido = require('../models/Pedido');
-
+// Importamos el modelo de Producto para verificar que los productos en el pedido existan y tengan stock
+const Producto = require('../models/Producto');
 exports.crearPedido = async (req, res) => {
     try {
         const { productos, total, correoComprador, direccionEnvio, telefonoComprador } = req.body;
