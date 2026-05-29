@@ -8,7 +8,8 @@ const router = express.Router();
 const productoController = require('../controllers/productoController');
 const upload = require('../config/cloudinary'); // 1. Importamos a nuestro "portero"
 const auth = require('../middleware/auth'); // 1. Importamos a nuestro guardia de seguridad
-
+// --- Importamos a nuestro guardia anti-crasheos ---
+const validarMongoId = require('../middleware/validarMongoId');
 
 // rutas para filtrar por marca se pone antes de la ruta general para obtener productos,
 //  porque si no, se va a confundir y va a pensar que "marcas" es un ID de producto
@@ -23,9 +24,9 @@ router.post('/', auth.verificarTokenYRol, upload.single('imagen'), productoContr
 router.get('/', productoController.obtenerProductos);
 
 // UPDATE: Actualizar un producto específico (necesitamos su ID)
-router.put('/:id', auth.verificarTokenYRol, productoController.actualizarProducto);
+router.put('/:id',validarMongoId, auth.verificarTokenYRol, productoController.actualizarProducto);
 
 // DELETE: Eliminar un producto específico (necesitamos su ID)
-router.delete('/:id', auth.verificarTokenYRol, productoController.eliminarProducto);
+router.delete('/:id', validarMongoId, auth.verificarTokenYRol, productoController.eliminarProducto);
 
 module.exports = router;

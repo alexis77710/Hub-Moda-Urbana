@@ -1,4 +1,8 @@
 // Archivo: lib/services/brand_service.dart
+// Este servicio es el encargado de manejar todo lo relacionado con las marcas, 
+//como enviar la solicitud de registro al backend. 
+//Aquí es donde se hace la magia de conectar nuestra app con el servidor 
+//para que las marcas puedan registrarse y empezar a usar la plataforma.
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 
@@ -13,6 +17,7 @@ class BrandService {
           'Content-Type': 'application/json',
           'x-app-source': 'hub_moda_app_2026' // ¡El candado anti-bots!
         },
+        // ¡Aquí va toda la info que el backend necesita para registrar la marca! Ojo que el backend espera estos campos exactos, así que no los cambies sin revisar el backend primero.
         body: jsonEncode({
           'nombreMarca': nombre,
           'identificacion': identificacion,
