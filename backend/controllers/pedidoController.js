@@ -10,7 +10,7 @@ exports.crearPedido = async (req, res) => {
         const { productos, total, correoComprador, direccionEnvio, telefonoComprador } = req.body;
 
         const appToken = req.headers['x-app-source'];
-        if (appToken !== 'hub_moda_app_2026') {
+        if (appToken !== process.env.APP_SECRET_TOKEN) {//cambios aqui
             return res.status(401).json({ msg: 'Petición rechazada, usa la app oficial bro 🛑' });
         }
 

@@ -9,7 +9,7 @@ import 'dart:convert';
 class BrandService {
   final String _url = 'http://localhost:4000/api/marcas/registro';
 
-  Future<void> solicitarRegistro(String nombre, String identificacion, String instagram, String correo, String password) async {
+  Future<void> solicitarRegistro(String nombre, String ruc, String identificacion, String instagram, String correo, String password, String codigoOtp) async {
     try {
       final response = await http.post(
         Uri.parse(_url),
@@ -20,10 +20,12 @@ class BrandService {
         // ¡Aquí va toda la info que el backend necesita para registrar la marca! Ojo que el backend espera estos campos exactos, así que no los cambies sin revisar el backend primero.
         body: jsonEncode({
           'nombreMarca': nombre,
+          'ruc': ruc,
           'identificacion': identificacion,
           'instagram': instagram,
           'correo': correo,
           'password': password,
+          'codigoOtp': codigoOtp,
         }),
       );
 
@@ -37,6 +39,28 @@ class BrandService {
     } catch (e) {
       if (e is String) throw e;
       throw 'Error de conexión con el servidor bro 😅';
+    }
+  }
+
+  // --- NUEVA FUNCIÓN: Pedir el código al correo ---
+  Future<void> enviarCodigoOtp(String correo) async {
+    final String urlOtp = 'http://localhost:4000/api/marcas/enviar-otp';
+    try {
+      final response = await http.post(
+        Uri.parse(urlOtp),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'correo': correo}),
+      );
+
+      if (response.statusCode == 200) {
+        return; // Código enviado exitosamente
+      } else {
+        final errorData = jsonDecode(response.body);
+        throw errorData['msg'] ?? 'Error al pedir código';
+      }
+    } catch (e) {
+      if (e is String) throw e;
+      throw 'Error de conexión bro 😅';
     }
   }
 }

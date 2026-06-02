@@ -1,5 +1,7 @@
 // Archivo: lib/screens/brand_register_screen.dart
 // Esta pantalla es para que las marcas puedan solicitar su registro en el Hub de Moda.
+// Aquí las marcas llenan un formulario con su información, y al enviar se conecta con el BrandService para mandar la solicitud al backend.
+// Además, implementamos validaciones para asegurarnos de que los datos ingresados sean correctos
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../services/brand_service.dart';
@@ -13,80 +15,249 @@ class BrandRegisterScreen extends StatefulWidget {
 
 class _BrandRegisterScreenState extends State<BrandRegisterScreen> {
   final TextEditingController _nombreMarcaController = TextEditingController();
-  final TextEditingController _identificacionController =
-      TextEditingController(); // Ahora es Cédula o RUC
+  final TextEditingController _rucController = TextEditingController(); 
+  final TextEditingController _identificacionController = TextEditingController(); 
   final TextEditingController _instagramController = TextEditingController();
   final TextEditingController _correoController = TextEditingController();
+  
   final TextEditingController _passwordController = TextEditingController();
-  final BrandService _brandService =
-      BrandService(); // Servicio para conectar con el backend
+  final TextEditingController _confirmPasswordController = TextEditingController(); // <-- NUEVA CAJA
+  
+  final BrandService _brandService = BrandService(); 
   bool _estaCargando = false;
 
-  // Variables para guardar los mensajes de error de cada caja
+  // --- NUEVAS VARIABLES PARA LOS OJITOS 👀 ---
+  bool _ocultarPassword = true;
+  bool _ocultarConfirmPassword = true;
+
   String? errorNombre;
+  String? errorRuc; 
   String? errorIdentificacion;
   String? errorInstagram;
   String? errorCorreo;
   String? errorPassword;
-// --- FUNCIÓN MATEMÁTICA: Módulo 10 para Cédula y RUC ---
-  bool _validarIdentificacionEcuatoriana(String id) {
-    if (id.length != 10 && id.length != 13) return false;
-    
-    // Si es RUC (13 dígitos), los últimos 3 deben ser '001' (Para personas naturales)
-    if (id.length == 13 && !id.endsWith('001')) return false;
+  String? errorConfirmPassword; // <-- NUEVO ERROR
 
-    // Extraemos solo los primeros 10 dígitos (la cédula base)
-    final cedula = id.substring(0, 10);
+  // --- Validador de RUC Ecuatoriano ---
+  bool _validarRucEcuador(String ruc) {
+    if (ruc.length != 13) return false;
+    final int provincia = int.tryParse(ruc.substring(0, 2)) ?? 0;
+    if ((provincia < 1 || provincia > 24) && provincia != 30) return false;
+    if (ruc.substring(10, 13) == '000') return false;
+
+    final int tercerDigito = int.tryParse(ruc.substring(2, 3)) ?? 0;
+
+    if (tercerDigito == 9) { 
+      final coeficientes = [4, 3, 2, 7, 6, 5, 4, 3, 2];
+      final int verificador = int.tryParse(ruc.substring(9, 10)) ?? 0;
+      int suma = 0;
+      for (int i = 0; i < 9; i++) {
+        suma += (int.tryParse(ruc.substring(i, i + 1)) ?? 0) * coeficientes[i];
+      }
+      final int residuo = suma % 11;
+      final int resultado = residuo == 0 ? 0 : 11 - residuo;
+      return resultado == verificador;
+    }
+
+    if (tercerDigito == 6) { 
+      final coeficientes = [3, 2, 7, 6, 5, 4, 3, 2];
+      final int verificador = int.tryParse(ruc.substring(8, 9)) ?? 0;
+      int suma = 0;
+      for (int i = 0; i < 8; i++) {
+        suma += (int.tryParse(ruc.substring(i, i + 1)) ?? 0) * coeficientes[i];
+      }
+      final int residuo = suma % 11;
+      final int resultado = residuo == 0 ? 0 : 11 - residuo;
+      return resultado == verificador;
+    }
+
+    if (tercerDigito < 6) { 
+      final int verificador = int.tryParse(ruc.substring(9, 10)) ?? 0;
+      int suma = 0;
+      for (int i = 0; i < 9; i++) {
+        int valor = int.tryParse(ruc.substring(i, i + 1)) ?? 0;
+        if (i % 2 == 0) {
+          valor = valor * 2;
+          if (valor > 9) valor -= 9;
+        }
+        suma += valor;
+      }
+      int primerDigitoSuma = int.parse(suma.toString().substring(0, 1));
+      int decenaSuperior = (primerDigitoSuma + 1) * 10;
+      if (suma % 10 == 0) decenaSuperior = suma; 
+      int resultado = decenaSuperior - suma;
+      if (resultado == 10) resultado = 0;
+      return resultado == verificador;
+    }
+    return false;
+  }
+
+  // --- Validador de Cédula Ecuatoriana ---
+  bool _validarCedulaEcuatoriana(String cedula) {
+    if (cedula.length != 10) return false;
     
-    final provincia = int.parse(cedula.substring(0, 2));
+    final int provincia = int.tryParse(cedula.substring(0, 2)) ?? 0;
     if (provincia < 1 || provincia > 24) return false;
-    
-    final tercerDigito = int.parse(cedula[2]);
+
+    final int tercerDigito = int.tryParse(cedula.substring(2, 3)) ?? 0;
     if (tercerDigito >= 6) return false;
 
     final coeficientes = [2, 1, 2, 1, 2, 1, 2, 1, 2];
     int suma = 0;
-    
+
     for (int i = 0; i < 9; i++) {
-      int valor = int.parse(cedula[i]) * coeficientes[i];
+      int valor = (int.tryParse(cedula.substring(i, i + 1)) ?? 0) * coeficientes[i];
       if (valor > 9) valor -= 9;
       suma += valor;
     }
-    
+
     int digitoEsperado = 10 - (suma % 10);
     if (digitoEsperado == 10) digitoEsperado = 0;
 
-    return digitoEsperado == int.parse(cedula[9]);
+    final int verificador = int.tryParse(cedula.substring(9, 10)) ?? 0;
+    return digitoEsperado == verificador;
   }
+// --- FUNCIÓN PARA MOSTRAR LA VENTANITA DEL CÓDIGO ---
+ 
+  Future<void> _mostrarVentanaOtp(String nombre, String ruc, String identificacion, String instagram, String correo, String password) async {
+    final TextEditingController _otpController = TextEditingController();
+    bool isCargandoOtp = false;
+    String? errorOtp; // <-- NUEVA VARIABLE: Solo vive dentro de este Pop-up
+
+    await showDialog(
+      context: context,
+      barrierDismissible: false, // No deja cerrar picando afuera
+      builder: (context) {
+        return StatefulBuilder( 
+          builder: (context, setStateDialog) { // setStateDialog actualiza solo la ventanita
+            return AlertDialog(
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+              title: const Text('Verifica tu correo 📩', textAlign: TextAlign.center, style: TextStyle(fontWeight: FontWeight.bold)),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text('Ingresa el código de 6 dígitos que enviamos a:\n$correo', textAlign: TextAlign.center),
+                  const SizedBox(height: 20),
+                  TextField(
+                    controller: _otpController,
+                    keyboardType: TextInputType.number,
+                    inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                    maxLength: 6,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, letterSpacing: 8),
+                    decoration: InputDecoration( // Le quitamos el 'const' porque ahora es dinámico
+                      hintText: '000000',
+                      border: const OutlineInputBorder(),
+                      counterText: '',
+                      errorText: errorOtp, // <-- MAGIA: El error sale debajo de esta caja
+                    ),
+                  ),
+                ],
+              ),
+              actionsAlignment: MainAxisAlignment.center,
+              actions: [
+                TextButton(
+                  onPressed: isCargandoOtp ? null : () => Navigator.pop(context),
+                  child: const Text('Cancelar', style: TextStyle(color: Colors.grey)),
+                ),
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(backgroundColor: Colors.black, foregroundColor: Colors.white),
+                  onPressed: isCargandoOtp ? null : () async {
+                    // 1. Validación si la caja está vacía o incompleta
+                    if (_otpController.text.length != 6) {
+                      setStateDialog(() {
+                        errorOtp = 'Ingresa los 6 dígitos exactos bro 🛑';
+                      });
+                      return;
+                    }
+
+                    // 2. Apagamos errores previos y prendemos el cargando
+                    setStateDialog(() {
+                      isCargandoOtp = true;
+                      errorOtp = null; 
+                    });
+
+                    try {
+                      // LLAMADA FINAL: Mandamos todo + el código al backend
+                      await _brandService.solicitarRegistro(
+                        nombre, ruc, identificacion, instagram, correo, password, _otpController.text
+                      );
+
+                      if (!mounted) return;
+                      Navigator.pop(context); // Cerramos el Pop-up
+                      
+                      // Si todo sale bien, este es el único SnackBar que sale (el verde)
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('¡Te avisaremos si cumples con los requisitos 🏢✨'), backgroundColor: Colors.green),
+                      );
+                      
+                      if (Navigator.canPop(context)) Navigator.pop(context); // Volvemos a la pantalla anterior
+
+                    } catch (error) {
+                      // 3. ¡EL ATAJE DEL ERROR! Si Node.js rechaza el código, lo pintamos en la caja
+                      setStateDialog(() {
+                        errorOtp = error.toString();
+                      });
+                    } finally {
+                      setStateDialog(() => isCargandoOtp = false);
+                    }
+                  },
+                  child: isCargandoOtp 
+                      ? const SizedBox(height: 15, width: 15, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                      : const Text('Verificar y Enviar', style: TextStyle(fontWeight: FontWeight.bold)),
+                ),
+              ],
+            );
+          }
+        );
+      }
+    );
+  }
+
   Future<void> _enviarSolicitud() async {
-    // 1. Extraemos los textos primero
     final nombre = _nombreMarcaController.text.trim();
+    final ruc = _rucController.text.trim();
     final identificacion = _identificacionController.text.trim();
     final instagram = _instagramController.text.trim();
     final correo = _correoController.text.trim();
     final password = _passwordController.text;
+    final confirmPassword = _confirmPasswordController.text;
 
     bool hayErrores = false;
 
-    // 2. Ejecutamos el setState SOLO para actualizar los textos rojos en la pantalla
     setState(() {
       errorNombre = null;
+      errorRuc = null;
       errorIdentificacion = null;
       errorInstagram = null;
       errorCorreo = null;
       errorPassword = null;
+      errorConfirmPassword = null; // <-- LIMPIAMOS ERROR
 
       if (nombre.isEmpty) {
         errorNombre = 'Bro, dinos cómo se llama tu marca';
         hayErrores = true;
       }
 
-     // Validamos Cédula (10) o RUC (13) con pura matemática 🇪🇨
-      if (identificacion.isEmpty) {
-        errorIdentificacion = 'Falta tu número de identificación';
+      if (ruc.isEmpty) {
+        errorRuc = 'El RUC de la empresa es obligatorio';
         hayErrores = true;
-      } else if (!_validarIdentificacionEcuatoriana(identificacion)) {
-        errorIdentificacion = 'Esa Cédula o RUC no es válido o no existe bro 🛑';
+      } else if (ruc.length != 13) {
+        errorRuc = 'El RUC debe tener exactamente 13 dígitos bro';
+        hayErrores = true;
+      } else if (!_validarRucEcuador(ruc)) {
+        errorRuc = 'El RUC ingresado no es válido en Ecuador 🛑';
+        hayErrores = true;
+      }
+
+      if (identificacion.isEmpty) {
+        errorIdentificacion = 'Falta la cédula del representante';
+        hayErrores = true;
+      } else if (identificacion.length != 10) {
+        errorIdentificacion = 'La cédula debe tener exactamente 10 dígitos bro';
+        hayErrores = true;
+      } else if (!_validarCedulaEcuatoriana(identificacion)) {
+        errorIdentificacion = 'Esa cédula no es válida matemáticamente 🛑';
         hayErrores = true;
       }
 
@@ -116,69 +287,49 @@ class _BrandRegisterScreenState extends State<BrandRegisterScreen> {
         errorPassword = 'Pon algo más seguro, mínimo 6 caracteres';
         hayErrores = true;
       } else {
-        // Verificamos que tenga al menos una mayúscula y un número
         final tieneMayuscula = RegExp(r'[A-Z]').hasMatch(password);
         final tieneNumero = RegExp(r'[0-9]').hasMatch(password);
 
         if (!tieneMayuscula || !tieneNumero) {
-          errorPassword =
-              'Tu contraseña debe tener al menos una letra mayúscula y un número bro';
+          errorPassword = 'Debe tener al menos una letra mayúscula y un número bro';
           hayErrores = true;
         }
       }
+
+      // --- NUEVA VALIDACIÓN: COMPARAR CONTRASEÑAS ---
+      if (confirmPassword.isEmpty) {
+        errorConfirmPassword = 'Confirma tu contraseña bro';
+        hayErrores = true;
+      } else if (password != confirmPassword) {
+        errorConfirmPassword = 'Las contraseñas no coinciden 🛑';
+        hayErrores = true;
+      }
     });
 
-    // 3. ¡EL FRENO DE MANO REAL! (Fuera del setState)
-    // Si se prendió alguna alerta, la función muere aquí y no avanza al mensaje verde.
     if (hayErrores) return;
 
-    // 4. Si todo está perfecto, encendemos el circulito de carga
     setState(() {
       _estaCargando = true;
     });
 
-    // 5. Enviamos al backend
-    // 5. ¡LA CONEXIÓN REAL AL BACKEND!
     try {
-      await _brandService.solicitarRegistro(
-        nombre,
-        identificacion,
-        instagram,
-        correo,
-        password,
-      );
-
+      // 1. PRIMERO PEDIMOS EL CÓDIGO AL BACKEND
+      await _brandService.enviarCodigoOtp(correo);
+      
       if (!mounted) return;
+      
+      // 2. SI LLEGÓ BIEN, ABRIMOS LA VENTANITA PARA QUE LO ESCRIBA
+      _mostrarVentanaOtp(nombre, ruc, identificacion, instagram, correo, password);
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            '¡Solicitud enviada! Revisaremos tu marca y te avisaremos al correo 🏢✨',
-          ),
-          backgroundColor: Colors.green,
-          duration: Duration(seconds: 4),
-        ),
-      );
-
-      if (Navigator.canPop(context)) {
-        // Solo intentamos volver si hay una pantalla atrás, para evitar errores raros
-        Navigator.pop(context);
-      }
     } catch (error) {
       if (!mounted) return;
-
-      // Si Node.js rechaza algo (ej: correo duplicado), mostramos el mensaje rojo
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error: $error ❌'),
-          backgroundColor: Colors.red,
-          duration: const Duration(seconds: 4),
-        ),
+        SnackBar(content: Text('Error: $error ❌'), backgroundColor: Colors.red),
       );
     } finally {
       if (mounted) {
         setState(() {
-          _estaCargando = false; // Apagamos la carga pase lo que pase
+          _estaCargando = false; 
         });
       }
     }
@@ -200,27 +351,16 @@ class _BrandRegisterScreenState extends State<BrandRegisterScreen> {
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(
-              horizontal: 24.0,
-              vertical: 20.0,
-            ),
+            padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 20.0),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                const Icon(
-                  Icons.storefront_outlined,
-                  size: 60,
-                  color: Colors.black,
-                ),
+                const Icon(Icons.storefront_outlined, size: 60, color: Colors.black),
                 const SizedBox(height: 10),
                 const Text(
                   'ÚNETE AL HUB',
                   textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 32,
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: -1.0,
-                  ),
+                  style: TextStyle(fontSize: 32, fontWeight: FontWeight.w900, letterSpacing: -1.0),
                 ),
                 const SizedBox(height: 10),
                 const Text(
@@ -236,7 +376,22 @@ class _BrandRegisterScreenState extends State<BrandRegisterScreen> {
                     labelText: 'Nombre Comercial de la Marca',
                     hintText: 'Ej: Streetwear EC',
                     border: const OutlineInputBorder(),
-                    errorText: errorNombre, // <-- ALERTA EN LÍNEA
+                    errorText: errorNombre,
+                  ),
+                ),
+                const SizedBox(height: 16),
+
+                TextField(
+                  controller: _rucController,
+                  keyboardType: TextInputType.number,
+                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                  maxLength: 13,
+                  decoration: InputDecoration(
+                    labelText: 'RUC de la Empresa',
+                    hintText: 'Tus 13 dígitos fiscales',
+                    border: const OutlineInputBorder(),
+                    errorText: errorRuc,
+                    counterText: '',
                   ),
                 ),
                 const SizedBox(height: 16),
@@ -245,12 +400,12 @@ class _BrandRegisterScreenState extends State<BrandRegisterScreen> {
                   controller: _identificacionController,
                   keyboardType: TextInputType.number,
                   inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                  maxLength: 13,
+                  maxLength: 10,
                   decoration: InputDecoration(
-                    labelText: 'Cédula o RUC',
-                    hintText: 'Tus 10 o 13 dígitos fiscales',
+                    labelText: 'Cédula del Representante Legal',
+                    hintText: 'Tus 10 dígitos',
                     border: const OutlineInputBorder(),
-                    errorText: errorIdentificacion, // <-- ALERTA EN LÍNEA
+                    errorText: errorIdentificacion,
                     counterText: '',
                   ),
                 ),
@@ -262,7 +417,7 @@ class _BrandRegisterScreenState extends State<BrandRegisterScreen> {
                     labelText: 'Instagram Oficial',
                     hintText: 'Ej: @tu_marca',
                     border: const OutlineInputBorder(),
-                    errorText: errorInstagram, // <-- ALERTA EN LÍNEA
+                    errorText: errorInstagram,
                   ),
                 ),
                 const SizedBox(height: 16),
@@ -274,18 +429,53 @@ class _BrandRegisterScreenState extends State<BrandRegisterScreen> {
                     labelText: 'Correo de Contacto',
                     hintText: 'contacto@tumarca.com',
                     border: const OutlineInputBorder(),
-                    errorText: errorCorreo, // <-- ALERTA EN LÍNEA
+                    errorText: errorCorreo,
                   ),
                 ),
                 const SizedBox(height: 16),
 
+                // --- CAJA 1: CONTRASEÑA CON OJITO ---
                 TextField(
                   controller: _passwordController,
-                  obscureText: true,
+                  obscureText: _ocultarPassword, // Usamos la variable booleana
                   decoration: InputDecoration(
                     labelText: 'Crea una contraseña segura',
                     border: const OutlineInputBorder(),
-                    errorText: errorPassword, // <-- ALERTA EN LÍNEA
+                    errorText: errorPassword,
+                    suffixIcon: IconButton(
+                      icon: Icon(
+                        _ocultarPassword ? Icons.visibility_off : Icons.visibility,
+                        color: Colors.grey,
+                      ),
+                      onPressed: () {
+                        setState(() {
+                          _ocultarPassword = !_ocultarPassword; // Invertimos el valor
+                        });
+                      },
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+
+                // --- CAJA 2: CONFIRMAR CONTRASEÑA CON OJITO ---
+                TextField(
+                  controller: _confirmPasswordController,
+                  obscureText: _ocultarConfirmPassword,
+                  decoration: InputDecoration(
+                    labelText: 'Confirma tu contraseña',
+                    border: const OutlineInputBorder(),
+                    errorText: errorConfirmPassword,
+                    suffixIcon: IconButton(
+                      icon: Icon(
+                        _ocultarConfirmPassword ? Icons.visibility_off : Icons.visibility,
+                        color: Colors.grey,
+                      ),
+                      onPressed: () {
+                        setState(() {
+                          _ocultarConfirmPassword = !_ocultarConfirmPassword; 
+                        });
+                      },
+                    ),
                   ),
                 ),
                 const SizedBox(height: 30),
@@ -302,17 +492,11 @@ class _BrandRegisterScreenState extends State<BrandRegisterScreen> {
                         ? const SizedBox(
                             height: 20,
                             width: 20,
-                            child: CircularProgressIndicator(
-                              color: Colors.white,
-                              strokeWidth: 2,
-                            ),
+                            child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
                           )
                         : const Text(
                             'ENVIAR SOLICITUD DE MARCA',
-                            style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 16,
-                            ),
+                            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                           ),
                   ),
                 ),

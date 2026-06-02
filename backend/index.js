@@ -35,6 +35,22 @@ const limiter = rateLimit({
 });
 app.use(limiter);
 
+
+// Rate limit ESPECÍFICO para OTP (máximo 3 por correo cada 15 minutos)
+const otpLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,  // 15 minutos
+  max: 3,  // Máximo 3 OTPs
+  keyGenerator: (req, res) => {
+    // Usa el correo como clave, no la IP (así si muchos usan el mismo correo, solo se cuenta como 1)
+    return req.body.correo || req.ip;
+  },
+  message: { msg: "Demasiados intentos. Espera 15 minutos antes de solicitar otro código 🛑" },
+  skip: (req, res) => {
+    // Si no es una ruta de OTP, ignora este limiter
+    return !req.path.includes('/enviar-otp');
+  }
+});
+app.use(otpLimiter);
 // ==========================================
 //   CAPA 2: PARSING Y DESINFECCIÓN DE DATOS
 // ==========================================
