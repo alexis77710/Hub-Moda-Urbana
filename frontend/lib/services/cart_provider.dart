@@ -1,5 +1,5 @@
 // Archivo: lib/services/cart_provider.dart
-//Este archivo va a tener la lista de compras y la lógica para añadir ropa, 
+//Este archivo va a tener la lista de compras y la lógica para añadir ropa,
 //sumar los precios, y avisarle a la app cuando algo cambie.
 
 import 'package:flutter/material.dart';
@@ -33,10 +33,11 @@ class CartProvider extends ChangeNotifier {
 
   // 3. Lógica para añadir un producto
   void agregarAlCarrito(dynamic producto, String talla, String urlImagen) {
-    // Creamos un ID compuesto (producto + talla) 
+    // Creamos un ID compuesto (producto + talla)
     // Así, si el usuario compra el mismo Hoodie en 'S' y en 'M', cuentan como items separados.
     // Ojo: asumo que tu BD devuelve el id como '_id'. Si es 'id', cámbialo.
-    final String productoId = producto['_id']?.toString() ?? DateTime.now().toString();
+    final String productoId =
+        producto['_id']?.toString() ?? DateTime.now().toString();
     final String idUnico = '${productoId}_$talla';
 
     // Buscamos si ya existe exactamente ese producto con esa talla en el carrito
@@ -65,7 +66,7 @@ class CartProvider extends ChangeNotifier {
     }
 
     // ¡ESTO ES CLAVE! Grita a los 4 vientos que el carrito cambió para que la UI se actualice
-    notifyListeners(); 
+    notifyListeners();
   }
 
   // 4. Utilidad: Calcular cuántos artículos hay en total (para ponerle un numerito al icono de la bolsa)
@@ -75,24 +76,67 @@ class CartProvider extends ChangeNotifier {
 
   // Utilidad: Calcular el precio total a pagar
   double get precioTotal {
-    return _items.fold(0.0, (total, item) => total + (item.precio * item.cantidad));
+    return _items.fold(
+      0.0,
+      (total, item) => total + (item.precio * item.cantidad),
+    );
   }
 
+  // --- NUEVA FUNCIÓN: Sumar Cantidad Manualmente ---
+  void sumarCantidad(String idUnico) {
+    final index = _items.indexWhere((item) => item.id == idUnico);
+    if (index >= 0) {
+      _items[index].cantidad++;
+      notifyListeners();
+    }
+  }
 
-  // --- NUEVA FUNCIÓN PARA ELIMINAR ---
+  // --- NUEVA FUNCIÓN: Restar Cantidad Manualmente ---
+  void restarCantidad(String idUnico) {
+    final index = _items.indexWhere((item) => item.id == idUnico);
+    if (index >= 0) {
+      if (_items[index].cantidad > 1) {
+        _items[index].cantidad--;
+        notifyListeners();
+      } else {
+        // Si tiene 1 y le da al menos, lo eliminamos de la bolsa
+        eliminarDelCarrito(idUnico);
+      }
+    }
+  }
+
+  // --- FUNCIÓN PARA ELIMINAR ---
   void eliminarDelCarrito(String idUnico) {
-    // Busca en la lista el item que tenga ese ID compuesto y lo borra
     _items.removeWhere((item) => item.id == idUnico);
-    
-    // Le avisamos a todas las pantallas que el total de dinero y cantidad cambiaron
     notifyListeners();
   }
 
-  //Cuando la compra sea exitosa, no queremos que la ropa siga en la bolsita.
-  //Entonces, esta función va a vaciar todo el carrito y avisar a la app que se actualizó.
-  // --- FUNCIÓN PARA VACIAR TODO (Después de pagar) ---
+  // --- FUNCIÓN PARA VACIAR TODO ---
   void vaciarCarrito() {
     _items.clear();
     notifyListeners();
+  }
+
+  // ==========================================
+  //      LÓGICA FINANCIERA (SRI / IVA)
+  // ==========================================
+
+  // 1. El Subtotal (Lo que cuesta la ropa sin impuestos)
+  double get subtotal {
+    return _items.fold(
+      0.0,
+      (total, item) => total + (item.precio * item.cantidad),
+    );
+  }
+
+  // 2. El IVA (15% en Ecuador)
+  double get impuestosIva {
+    return subtotal * 0.15;
+  }
+
+  // 3. El Total Final a Pagar
+  // Ojo: Cambié el nombre de 'precioTotal' a 'totalFinal' para ser más precisos.
+  double get totalFinal {
+    return subtotal + impuestosIva;
   }
 }

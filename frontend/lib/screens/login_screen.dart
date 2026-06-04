@@ -8,6 +8,7 @@ import 'package:flutter/material.dart';
 import '../services/auth_service.dart'; // ¡Importamos el nuevo puente!
 import 'brand_register_screen.dart'; // Esta es la pantalla de registro de marcas, que por ahora es un placeholder pero ya la tenemos lista para cuando empecemos a hacer el formulario de registro de marcas.
 import 'register_screen.dart';
+import '../main_wrapper.dart';
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
 
@@ -26,7 +27,7 @@ class _LoginScreenState extends State<LoginScreen> {
   String? errorPassword;
   bool estaCargando = false; // Para que el botón muestre que está pensando
 
-  Future<void> intentarLogin() async {
+ Future<void> intentarLogin() async {
     final String email = emailController.text.trim();
     final String password = passwordController.text;
 
@@ -44,49 +45,49 @@ class _LoginScreenState extends State<LoginScreen> {
     }
 
     setState(() {
-      estaCargando = true; // Prendemos el "cargando"
+      estaCargando = true; 
     });
 
     try {
-      // ¡AQUÍ ESTÁ LA MAGIA! Llamamos al servicio en una sola línea
-      final tokenVip = await _authService.login(email, password);
+      // 1. LLAMAMOS AL SERVICIO
+      await _authService.login(email, password);
 
       if (!mounted) return;
 
-      print('AJAJAJ Pase VIP obtenido desde el servicio: $tokenVip');
-
+      // 2. MOSTRAMOS ÉXITO
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('¡Bienvenido a Hub Moda Urbana! 🚀'),
-          backgroundColor: Colors.black,
+          backgroundColor: Colors.green, // Lo puse verde para que combine con el registro
           duration: Duration(seconds: 2),
         ),
       );
 
-      // Aquí más adelante le diremos: "Navega al inicio ahora que ya tienes token"
+      // 3. ¡EL PARCHE FINAL! Lo mandamos directo al inicio y borramos el login del historial
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(builder: (context) => const MainWrapper()), // Asegúrate de importar main_wrapper.dart arriba
+        (Route<dynamic> route) => false,
+      );
+
     } catch (error) {
       if (!mounted) return;
 
       final String mensajeError = error.toString().toLowerCase();
 
       setState(() {
-        // Lógica visual: ¿A qué caja le echamos la culpa?
-        if (mensajeError.contains('usuario') ||
-            mensajeError.contains('correo') ||
-            mensajeError.contains('email')) {
+        if (mensajeError.contains('usuario') || mensajeError.contains('correo') || mensajeError.contains('email')) {
           errorEmail = error.toString();
-        } else if (mensajeError.contains('contraseña') ||
-            mensajeError.contains('clave')) {
+        } else if (mensajeError.contains('contraseña') || mensajeError.contains('clave') || mensajeError.contains('password')) {
           errorPassword = error.toString();
         } else {
-          // Si es un error general (ej: backend apagado), lo ponemos en el correo por ahora
           errorEmail = error.toString();
         }
       });
     } finally {
       if (mounted) {
         setState(() {
-          estaCargando = false; // Apagamos el "cargando" pase lo que pase
+          estaCargando = false; 
         });
       }
     }

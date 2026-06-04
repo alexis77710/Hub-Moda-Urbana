@@ -8,28 +8,67 @@ const Usuario = require("../models/Usuario");
 const bcrypt = require("bcryptjs");
 // 1. Importamos la librería para los Pases VIP
 const jwt = require("jsonwebtoken");
+// Importamos el modelo de Otp para manejar los códigos de verificación por correo
+const Otp = require("../models/Otp"); 
+// Importamos la función para enviar correos (si es que la usaremos aquí)
+const { enviarCorreoOTP } = require("../utils/emailService");
+
+// --- NUEVO: Generar OTP para Clientes Normales ---
+exports.generarOtpUsuario = async (req, res) => {
+  try {
+    const email = req.body.email?.trim().toLowerCase(); 
+    const nombre = req.body.nombre?.trim(); // Recibimos el nombre/username de Flutter
+
+    if (!email) return res.status(400).json({ msg: "Falta el correo bro" });
+
+    // 1. Validamos que el correo no esté repetido
+    const usuarioExistente = await Usuario.findOne({ email });
+    if (usuarioExistente) {
+      return res.status(400).json({ msg: "Bro, este correo ya tiene una cuenta activa" });
+    }
+
+    // 2. ¡EL NUEVO BLOQUEO!: Evitamos nombres de usuario duplicados (ej: alexis777)
+    if (nombre) {
+      const usernameRepetido = await Usuario.findOne({ nombre: new RegExp(`^${nombre}$`, 'i') });
+      if (usernameRepetido) {
+        return res.status(400).json({ msg: "Ese nombre de usuario ya está reclamado, intenta con otro bro 🏃‍♂️" });
+      }
+    }
+
+    const codigoGenerado = Math.floor(100000 + Math.random() * 900000).toString();
+    
+    await Otp.deleteMany({ correo: email }); 
+    const nuevoOtp = new Otp({ correo: email, codigo: codigoGenerado });
+    await nuevoOtp.save();
+
+    await enviarCorreoOTP(email, codigoGenerado);
+    res.status(200).json({ msg: "Código enviado al correo 🚀" });
+  } catch (error) {
+    console.error("Error OTP Usuario:", error);
+    res.status(500).send("Hubo un error al generar el código");
+  }
+};
+
 
 // Función para registrar un nuevo usuario
 exports.registrarUsuario = async (req, res) => {
   try {
-    // 1. Extraemos TODOS los datos necesarios, incluyendo el nombre
-    const { nombre, email, password } = req.body;
+    // 1. Extraemos TODOS los datos, incluyendo el NUEVO codigoOtp
+    const { nombre, email, password, codigoOtp } = req.body;
 
-    // Validamos que no falten datos (el nombre es obligatorio según tu modelo)
-    if (!nombre || !email || !password) {
+    // Validamos que no falten datos
+    if (!nombre || !email || !password || !codigoOtp) {
       return res.status(400).json({
-        msg: "Bro, faltan datos. Nombre, email y password son obligatorios 🛑",
+        msg: "Bro, faltan datos o el código de verificación 🛑",
       });
     }
 
     // Blindaje Anti-XSS (para el nombre)
     if (/[<>]/.test(nombre)) {
-      return res
-        .status(400)
-        .json({ msg: "Nada de hacks en el nombre, bro 🛡️" });
+      return res.status(400).json({ msg: "Nada de hacks en el nombre, bro 🛡️" });
     }
 
-    // --- EL NUEVO GUARDIA DE CONTRASEÑAS ---
+    // --- EL GUARDIA DE CONTRASEÑAS ---
     const passwordRegex = /^(?=.*[A-Z])(?=.*\d).{8,}$/;
     if (!passwordRegex.test(password)) {
       return res.status(400).json({
@@ -37,18 +76,27 @@ exports.registrarUsuario = async (req, res) => {
       });
     }
 
-    // 2. Revisamos si el usuario ya existe (pasando el email a minúsculas)
+    // --- EL NUEVO ESCUDO OTP ---
+    // Buscamos si el código coincide con el correo en la base de datos
+    const otpGuardado = await Otp.findOne({ correo: email.toLowerCase(), codigo: codigoOtp });
+    
+    if (!otpGuardado) {
+      return res.status(400).json({ msg: "Código incorrecto o ya expiró (duraba 5 min) ⏳" });
+    }
+
+    // Si el código es correcto, lo destruimos para que no se re-use
+    await Otp.deleteOne({ _id: otpGuardado._id });
+
+    // 2. Revisamos si el usuario ya existe (por si acaso)
     let usuario = await Usuario.findOne({ email: email.toLowerCase() });
     if (usuario) {
-      return res
-        .status(400)
-        .json({ msg: "Bro, este correo ya está registrado" });
+      return res.status(400).json({ msg: "Bro, este correo ya está registrado" });
     }
 
     // 3. Si no existe, creamos el nuevo usuario
     usuario = new Usuario({
       nombre,
-      email: email.toLowerCase(), // Guardamos siempre en minúsculas
+      email: email.toLowerCase(),
       password,
     });
 
@@ -67,17 +115,16 @@ exports.registrarUsuario = async (req, res) => {
       },
     };
 
-    // 7. Firmamos y entregamos el Token al instante de registrarse
+    // 7. Firmamos y entregamos el Token
     jwt.sign(
       payload,
       process.env.JWT_SECRET,
       { expiresIn: "30d" },
       (error, token) => {
         if (error) throw error;
-        // Le enviamos el Token y un mensaje de éxito
         res.status(201).json({
           msg: "¡Usuario creado con éxito y sesión iniciada! 🛡️",
-          token, // ¡El frontend agradecerá esto!
+          token,
         });
       },
     );

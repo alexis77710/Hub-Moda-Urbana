@@ -1,11 +1,9 @@
 // Archivo: lib/screens/cart_screen.dart
-// Esta pantalla va a mostrar lo que el usuario tiene en su carrito, y el total a pagar.
-
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../services/cart_provider.dart';
-import '../services/order_service.dart';
-import 'package:flutter/services.dart'; // <--- ¡Añade esto para poder bloquear letras!
+import 'package:flutter/services.dart'; 
+import 'payment_screen.dart';
 
 class CartScreen extends StatefulWidget {
   const CartScreen({super.key});
@@ -15,50 +13,12 @@ class CartScreen extends StatefulWidget {
 }
 
 class _CartScreenState extends State<CartScreen> {
-  final OrderService _orderService = OrderService();
-  bool _estaProcesando = false;
-
+  // Limpiecito: Ya no necesitamos _orderService ni _estaProcesando aquí bro ✨
   final TextEditingController _correoController = TextEditingController();
   final TextEditingController _direccionController = TextEditingController();
-  final TextEditingController _telefonoController = TextEditingController(); // ¡NUEVO!
+  final TextEditingController _telefonoController = TextEditingController();
 
-  Future<void> procesarPago(CartProvider carrito, String correo, String direccion, String telefono) async {
-    setState(() { _estaProcesando = true; });
-
-    try {
-      // Mandamos los 3 datos al backend
-      await _orderService.crearOrden(carrito.items, carrito.precioTotal, correo, direccion, telefono);
-      
-      if (!mounted) return;
-
-      carrito.vaciarCarrito();
-      _correoController.clear();
-      _direccionController.clear();
-      _telefonoController.clear();
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('¡Compra exitosa bro! Tu pedido va en camino 🚚🔥'),
-          backgroundColor: Colors.green,
-          duration: Duration(seconds: 3),
-        ),
-      );
-
-      Navigator.pop(context);
-
-    } catch (error) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error: $error ❌'), backgroundColor: Colors.red),
-      );
-    } finally {
-      if (mounted) {
-        setState(() { _estaProcesando = false; });
-      }
-    }
-  }
-
-void _mostrarFormularioEnvio(CartProvider carrito) {
+  void _mostrarFormularioEnvio(CartProvider carrito) {
     _correoController.clear();
     _direccionController.clear();
     _telefonoController.clear();
@@ -67,7 +27,9 @@ void _mostrarFormularioEnvio(CartProvider carrito) {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
       builder: (context) {
         String? errorCorreo;
         String? errorDireccion;
@@ -78,15 +40,24 @@ void _mostrarFormularioEnvio(CartProvider carrito) {
             return Padding(
               padding: EdgeInsets.only(
                 bottom: MediaQuery.of(context).viewInsets.bottom,
-                left: 24, right: 24, top: 24,
+                left: 24,
+                right: 24,
+                top: 24,
               ),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text('¿A DÓNDE LO ENVIAMOS? 📦', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900, letterSpacing: -0.5)),
+                  const Text(
+                    '¿A DÓNDE LO ENVIAMOS? 📦',
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: -0.5,
+                    ),
+                  ),
                   const SizedBox(height: 20),
-                  
+
                   TextField(
                     controller: _correoController,
                     keyboardType: TextInputType.emailAddress,
@@ -98,17 +69,16 @@ void _mostrarFormularioEnvio(CartProvider carrito) {
                     ),
                   ),
                   const SizedBox(height: 16),
-                  
+
                   TextField(
                     controller: _direccionController,
-                    // Limitamos visualmente para que no escriban un testamento, pero suficiente para una dirección larga
-                    maxLength: 60, 
+                    maxLength: 60,
                     decoration: InputDecoration(
                       labelText: 'Dirección de Entrega',
-                      hintText: 'Ej: Av. 6 de Diciembre y Patria', 
+                      hintText: 'Ej: Av. 6 de Diciembre y Patria',
                       border: const OutlineInputBorder(),
                       errorText: errorDireccion,
-                      counterText: '', // Oculta el numerito de "0/60" abajo
+                      counterText: '', 
                     ),
                   ),
                   const SizedBox(height: 16),
@@ -116,40 +86,41 @@ void _mostrarFormularioEnvio(CartProvider carrito) {
                   TextField(
                     controller: _telefonoController,
                     keyboardType: TextInputType.phone,
-                    // ¡LA MAGIA AQUÍ! Filtramos para que solo acepte dígitos y máximo 10
                     inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                     maxLength: 10,
                     decoration: InputDecoration(
                       labelText: 'Número de Teléfono',
-                      hintText: 'Ej: 0991234567', 
+                      hintText: 'Ej: 0991234567',
                       border: const OutlineInputBorder(),
                       errorText: errorTelefono,
-                      counterText: '', // Oculta el numerito de "0/10" abajo
+                      counterText: '', 
                     ),
                   ),
                   const SizedBox(height: 24),
-                  
+
                   SizedBox(
                     width: double.infinity,
                     height: 50,
                     child: ElevatedButton(
-                      style: ElevatedButton.styleFrom(backgroundColor: Colors.black, foregroundColor: Colors.white),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.black,
+                        foregroundColor: Colors.white,
+                      ),
                       onPressed: () {
                         setModalState(() {
-                       // 1. VALIDACIÓN DEL CORREO (Mejorada)
-                        final correo = _correoController.text.trim();
-                        // Regex estándar para correos (acepta .com, .ec, .net, etc.)
-                        final bool emailValido = RegExp(r"^[a-zA-Z0-9.a-zA-Z0-9.!#$%&'*+-/=?^_`{|}~]+@[a-zA-Z0-9]+\.[a-zA-Z]+").hasMatch(correo);
+                          final correo = _correoController.text.trim();
+                          final bool emailValido = RegExp(
+                            r"^[a-zA-Z0-9.a-zA-Z0-9.!#$%&'*+-/=?^_`{|}~]+@[a-zA-Z0-9]+\.[a-zA-Z]+",
+                          ).hasMatch(correo);
 
-                        if (correo.isEmpty) {
-                          errorCorreo = 'Bro, rellena el correo';
-                        } else if (!emailValido) {
-                          errorCorreo = 'Escribe un correo real (ej: tu@email.com o .ec)';
-                        } else {
-                          errorCorreo = null;
-                        }
+                          if (correo.isEmpty) {
+                            errorCorreo = 'Bro, rellena el correo';
+                          } else if (!emailValido) {
+                            errorCorreo = 'Escribe un correo real (ej: tu@email.com o .ec)';
+                          } else {
+                            errorCorreo = null;
+                          }
 
-                          // 2. VALIDACIÓN DE LA DIRECCIÓN
                           final direccion = _direccionController.text.trim();
                           if (direccion.isEmpty) {
                             errorDireccion = 'Bro, rellena la ubicación';
@@ -159,40 +130,48 @@ void _mostrarFormularioEnvio(CartProvider carrito) {
                             errorDireccion = null;
                           }
 
-                          // 3. VALIDACIÓN DEL TELÉFONO
                           final telefono = _telefonoController.text.trim();
                           if (telefono.isEmpty) {
                             errorTelefono = 'Bro, rellena el teléfono';
                           } else if (telefono.length != 10) {
-                            // Validamos la longitud exacta de los números de Ecuador
                             errorTelefono = 'El número debe tener exactamente 10 dígitos';
                           } else if (!telefono.startsWith('0')) {
-                            // Validamos que empiece con 0 (como 099, 098...)
                             errorTelefono = 'El número debe empezar con 0';
                           } else {
                             errorTelefono = null;
                           }
                         });
 
-                        // Si ALGUNO tiene un error, frenamos aquí y no mandamos nada al backend
                         if (errorCorreo != null || errorDireccion != null || errorTelefono != null) {
-                          return; 
+                          return;
                         }
-                        
-                        // Si todo está verde, ¡Cerramos modal y compramos!
+
                         Navigator.pop(context);
-                        procesarPago(carrito, _correoController.text.trim(), _direccionController.text.trim(), _telefonoController.text.trim());
+
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => PaymentScreen(
+                              correo: _correoController.text.trim(),
+                              direccion: _direccionController.text.trim(),
+                              telefono: _telefonoController.text.trim(),
+                            ),
+                          ),
+                        );
                       },
-                      child: const Text('PEDIR PARA PAGO CONTRA ENTREGA', style: TextStyle(fontWeight: FontWeight.bold)),
+                      child: const Text(
+                        'CONTINUAR AL PAGO',
+                        style: TextStyle(fontWeight: FontWeight.bold),
+                      ),
                     ),
                   ),
                   const SizedBox(height: 24),
                 ],
               ),
             );
-          }
+          },
         );
-      }
+      },
     );
   }
 
@@ -202,14 +181,22 @@ void _mostrarFormularioEnvio(CartProvider carrito) {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('TU BOLSITA 🛍️', style: TextStyle(fontWeight: FontWeight.w900, letterSpacing: -1.0)),
+        title: const Text(
+          'TU BOLSITA 🛍️',
+          style: TextStyle(fontWeight: FontWeight.w900, letterSpacing: -1.0),
+        ),
         centerTitle: true,
         backgroundColor: Colors.transparent,
         elevation: 0,
         foregroundColor: Colors.black,
       ),
       body: carrito.items.isEmpty
-          ? const Center(child: Text('Tu carrito está más vacío que mi billetera bro 💨', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)))
+          ? const Center(
+              child: Text(
+                'Tu carrito está más vacío que mi billetera bro 💨',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              ),
+            )
           : Column(
               children: [
                 Expanded(
@@ -234,30 +221,70 @@ void _mostrarFormularioEnvio(CartProvider carrito) {
                         child: Container(
                           margin: const EdgeInsets.only(bottom: 16),
                           padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(color: Colors.white, border: Border.all(color: Colors.black12)),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            border: Border.all(color: Colors.black12),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
                           child: Row(
                             children: [
                               Container(
-                                width: 80, height: 80,
-                                decoration: BoxDecoration(color: Colors.grey[200], image: DecorationImage(image: NetworkImage(item.imagen), fit: BoxFit.cover)),
+                                width: 80,
+                                height: 80,
+                                decoration: BoxDecoration(
+                                  color: Colors.grey[200],
+                                  borderRadius: BorderRadius.circular(8),
+                                  image: DecorationImage(
+                                    image: NetworkImage(item.imagen),
+                                    fit: BoxFit.cover,
+                                  ),
+                                ),
                               ),
                               const SizedBox(width: 16),
                               Expanded(
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    Text(item.nombre, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16), maxLines: 1, overflow: TextOverflow.ellipsis),
+                                    Text(
+                                      item.nombre,
+                                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
                                     const SizedBox(height: 4),
-                                    Text('Talla: ${item.talla}', style: const TextStyle(color: Colors.black54, fontWeight: FontWeight.w600)),
+                                    Text(
+                                      'Talla: ${item.talla}',
+                                      style: const TextStyle(color: Colors.black54, fontWeight: FontWeight.w600),
+                                    ),
                                     const SizedBox(height: 4),
-                                    Text('\$${item.precio}', style: const TextStyle(fontWeight: FontWeight.bold)),
+                                    Text(
+                                      '\$${item.precio}',
+                                      style: const TextStyle(fontWeight: FontWeight.bold),
+                                    ),
                                   ],
                                 ),
                               ),
                               Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                                color: Colors.black,
-                                child: Text('x${item.cantidad}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 16)),
+                                decoration: BoxDecoration(
+                                  border: Border.all(color: Colors.grey.shade300),
+                                  borderRadius: BorderRadius.circular(20),
+                                ),
+                                child: Row(
+                                  children: [
+                                    IconButton(
+                                      icon: const Icon(Icons.remove, size: 16),
+                                      onPressed: () => Provider.of<CartProvider>(context, listen: false).restarCantidad(item.id),
+                                    ),
+                                    Text(
+                                      '${item.cantidad}',
+                                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                                    ),
+                                    IconButton(
+                                      icon: const Icon(Icons.add, size: 16),
+                                      onPressed: () => Provider.of<CartProvider>(context, listen: false).sumarCantidad(item.id),
+                                    ),
+                                  ],
+                                ),
                               ),
                             ],
                           ),
@@ -266,34 +293,60 @@ void _mostrarFormularioEnvio(CartProvider carrito) {
                     },
                   ),
                 ),
-                
+
                 Container(
                   padding: const EdgeInsets.all(24),
-                  decoration: const BoxDecoration(color: Colors.white, border: Border(top: BorderSide(color: Colors.black12))),
+                  decoration: const BoxDecoration(
+                    color: Colors.white,
+                    border: Border(top: BorderSide(color: Colors.black12)),
+                  ),
                   child: SafeArea(
                     child: Column(
                       children: [
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            const Text('TOTAL', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.black54)),
-                            Text('\$${carrito.precioTotal.toStringAsFixed(2)}', style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w900)),
+                            const Text('Subtotal', style: TextStyle(color: Colors.black54, fontWeight: FontWeight.w600)),
+                            Text('\$${carrito.subtotal.toStringAsFixed(2)}', style: const TextStyle(fontWeight: FontWeight.bold)),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const Text('IVA (15%)', style: TextStyle(color: Colors.black54, fontWeight: FontWeight.w600)),
+                            Text('\$${carrito.impuestosIva.toStringAsFixed(2)}', style: const TextStyle(fontWeight: FontWeight.bold)),
+                          ],
+                        ),
+                        const Divider(height: 24, thickness: 1),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const Text('TOTAL', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.black)),
+                            Text('\$${carrito.totalFinal.toStringAsFixed(2)}', style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w900)),
                           ],
                         ),
                         const SizedBox(height: 20),
+                        // --- AQUÍ EL BOTÓN YA LIMPIO SANO Y DIRECTO ---
                         SizedBox(
                           width: double.infinity,
+                          height: 50,
                           child: ElevatedButton(
-                            onPressed: _estaProcesando ? null : () => _mostrarFormularioEnvio(carrito),
-                            child: _estaProcesando 
-                                ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                                : const Text('PROCEDER AL PAGO'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.black,
+                              foregroundColor: Colors.white,
+                            ),
+                            onPressed: () => _mostrarFormularioEnvio(carrito), // Directo al modal bro
+                            child: const Text(
+                              'PROCEDER AL PAGO',
+                              style: TextStyle(fontWeight: FontWeight.bold),
+                            ),
                           ),
                         ),
                       ],
                     ),
                   ),
-                )
+                ),
               ],
             ),
     );

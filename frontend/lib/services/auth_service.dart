@@ -1,18 +1,21 @@
 // Archivo: lib/services/auth_service.dart
 // Este servicio se encarga de manejar la lógica de conexión con el backend para el login
 // Archivo: lib/services/auth_service.dart
+// Archivo: lib/services/auth_service.dart
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:jwt_decoder/jwt_decoder.dart'; // Importante para leer el token
+import 'package:jwt_decoder/jwt_decoder.dart'; 
 
 class AuthService {
-  final String _url = 'http://localhost:4000/api/auth/login';
+  final String _urlLogin = 'http://localhost:4000/api/auth/login';
+  final String _urlRegistro = 'http://localhost:4000/api/auth/registrar';
+  final String _urlOtp = 'http://localhost:4000/api/auth/enviar-otp'; // <-- NUEVA RUTA
 
   Future<String> login(String email, String password) async {
     try {
       final response = await http.post(
-        Uri.parse(_url),
+        Uri.parse(_urlLogin),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({'email': email, 'password': password}),
       );
@@ -21,13 +24,9 @@ class AuthService {
 
       if (response.statusCode == 200) {
         String token = data['token'];
-
-        // ¡LA MAGIA DEL DECODER! Extraemos el rol del token
         Map<String, dynamic> decodedToken = JwtDecoder.decode(token);
-        String rol =
-            decodedToken['usuario']['rol']; // Sacamos el rol del payload
+        String rol = decodedToken['usuario']['rol']; 
 
-        // Guardamos el token y el rol en la memoria del celular
         SharedPreferences prefs = await SharedPreferences.getInstance();
         await prefs.setString('jwt_token', token);
         await prefs.setString('user_rol', rol);
@@ -42,32 +41,48 @@ class AuthService {
     }
   }
 
-  // --- NUEVA FUNCIÓN: REGISTRAR CLIENTE ---
-  Future<String> registrar(String nombre, String email, String password) async {
-    final String urlRegistro = 'http://localhost:4000/api/auth/registrar';
-
+  // --- NUEVA FUNCIÓN: PEDIR EL CÓDIGO AL CORREO ---
+  Future<void> enviarCodigoOtp(String email) async {
     try {
       final response = await http.post(
-        Uri.parse(urlRegistro),
+        Uri.parse(_urlOtp),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'email': email}),
+      );
+
+      if (response.statusCode == 200) {
+        return; 
+      } else {
+        final errorData = jsonDecode(response.body);
+        throw errorData['msg'] ?? 'Error al pedir código';
+      }
+    } catch (e) {
+      if (e is String) throw e;
+      throw 'Error de conexión bro 😅';
+    }
+  }
+
+  // --- FUNCIÓN REGISTRAR ACTUALIZADA (AHORA EXIGE CÓDIGO) ---
+  Future<String> registrar(String nombre, String email, String password, String codigoOtp) async {
+    try {
+      final response = await http.post(
+        Uri.parse(_urlRegistro),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
           'nombre': nombre,
           'email': email,
           'password': password,
+          'codigoOtp': codigoOtp, // <-- MANDAMOS EL CÓDIGO
         }),
       );
 
       final data = jsonDecode(response.body);
 
       if (response.statusCode == 201) {
-        // El backend devuelve el token en data['token']
         String token = data['token'];
-
-        // Extraemos el rol (que por defecto será 'cliente')
         Map<String, dynamic> decodedToken = JwtDecoder.decode(token);
         String rol = decodedToken['usuario']['rol'];
 
-        // Guardamos todo en memoria
         SharedPreferences prefs = await SharedPreferences.getInstance();
         await prefs.setString('jwt_token', token);
         await prefs.setString('user_rol', rol);
@@ -82,7 +97,6 @@ class AuthService {
     }
   }
 
-  // Función extra para leer el rol fácilmente desde cualquier pantalla
   Future<String?> obtenerRolGuardado() async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
     return prefs.getString('user_rol');

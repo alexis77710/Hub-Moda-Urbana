@@ -1,3 +1,4 @@
+// Archivo: backend/config/cloudinary.js
 // aqui configuramos Cloudinary para que Multer sepa dónde guardar las imágenes 
 // que subamos desde el formulario de productos.
 
