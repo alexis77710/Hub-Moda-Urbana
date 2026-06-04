@@ -74,34 +74,7 @@ class _HomeScreenState extends State<HomeScreen> {
         backgroundColor: Colors.transparent,
         elevation: 0,
         foregroundColor: Colors.black,
-        actions: [
-          Consumer<CartProvider>(
-            builder: (context, carrito, child) {
-              return Padding(
-                padding: const EdgeInsets.only(right: 15.0),
-                child: Badge(
-                  isLabelVisible: carrito.cantidadTotal > 0,
-                  label: Text(
-                    carrito.cantidadTotal.toString(),
-                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-                  ),
-                  backgroundColor: Colors.red,
-                  child: IconButton(
-                    icon: const Icon(Icons.shopping_bag_outlined, size: 28),
-                    onPressed: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => const CartScreen(),
-                        ),
-                      );
-                    },
-                  ),
-                ),
-              );
-            },
-          )
-        ],
+        
       ),
       
       // --- LA MAGIA: EL BOTÓN CONDICIONAL ---

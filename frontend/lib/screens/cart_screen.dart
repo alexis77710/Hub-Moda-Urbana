@@ -2,8 +2,10 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../services/cart_provider.dart';
-import 'package:flutter/services.dart'; 
+import 'package:flutter/services.dart';
 import 'payment_screen.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'login_screen.dart'; // Importamos tu pantalla de login
 
 class CartScreen extends StatefulWidget {
   const CartScreen({super.key});
@@ -14,12 +16,38 @@ class CartScreen extends StatefulWidget {
 
 class _CartScreenState extends State<CartScreen> {
   // Limpiecito: Ya no necesitamos _orderService ni _estaProcesando aquí bro ✨
-  final TextEditingController _correoController = TextEditingController();
+
   final TextEditingController _direccionController = TextEditingController();
   final TextEditingController _telefonoController = TextEditingController();
 
-  void _mostrarFormularioEnvio(CartProvider carrito) {
-    _correoController.clear();
+  // --- NUEVO: EL CANDADO DE SEGURIDAD ---
+  Future<void> _verificarSesionYProceder(CartProvider carrito) async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    String? token = prefs.getString('jwt_token');
+
+    if (token == null || token.isEmpty) {
+      // ❌ NO ESTÁ LOGUEADO: Lo mandamos al Login
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Bro, inicia sesión o regístrate para comprar 🛑'),
+          backgroundColor: Colors.orange,
+          duration: Duration(seconds: 3),
+        ),
+      );
+
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => const LoginScreen()),
+      );
+    } else {
+      // ✅ SÍ ESTÁ LOGUEADO: Le abrimos el Modal de envío
+      _mostrarFormularioEnvio(carrito);
+    }
+  }
+
+ void _mostrarFormularioEnvio(CartProvider carrito) {
+    // ❌ Adiós _correoController.clear();
     _direccionController.clear();
     _telefonoController.clear();
 
@@ -31,7 +59,7 @@ class _CartScreenState extends State<CartScreen> {
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       builder: (context) {
-        String? errorCorreo;
+        // ❌ Adiós String? errorCorreo;
         String? errorDireccion;
         String? errorTelefono;
 
@@ -40,9 +68,7 @@ class _CartScreenState extends State<CartScreen> {
             return Padding(
               padding: EdgeInsets.only(
                 bottom: MediaQuery.of(context).viewInsets.bottom,
-                left: 24,
-                right: 24,
-                top: 24,
+                left: 24, right: 24, top: 24,
               ),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
@@ -50,25 +76,11 @@ class _CartScreenState extends State<CartScreen> {
                 children: [
                   const Text(
                     '¿A DÓNDE LO ENVIAMOS? 📦',
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.w900,
-                      letterSpacing: -0.5,
-                    ),
+                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900, letterSpacing: -0.5),
                   ),
                   const SizedBox(height: 20),
 
-                  TextField(
-                    controller: _correoController,
-                    keyboardType: TextInputType.emailAddress,
-                    decoration: InputDecoration(
-                      labelText: 'Tu Correo Electrónico',
-                      hintText: 'ejemplo@correo.com',
-                      border: const OutlineInputBorder(),
-                      errorText: errorCorreo,
-                    ),
-                  ),
-                  const SizedBox(height: 16),
+                  // ❌ ELIMINAMOS EL TEXTFIELD DEL CORREO COMPLETAMENTE
 
                   TextField(
                     controller: _direccionController,
@@ -108,18 +120,7 @@ class _CartScreenState extends State<CartScreen> {
                       ),
                       onPressed: () {
                         setModalState(() {
-                          final correo = _correoController.text.trim();
-                          final bool emailValido = RegExp(
-                            r"^[a-zA-Z0-9.a-zA-Z0-9.!#$%&'*+-/=?^_`{|}~]+@[a-zA-Z0-9]+\.[a-zA-Z]+",
-                          ).hasMatch(correo);
-
-                          if (correo.isEmpty) {
-                            errorCorreo = 'Bro, rellena el correo';
-                          } else if (!emailValido) {
-                            errorCorreo = 'Escribe un correo real (ej: tu@email.com o .ec)';
-                          } else {
-                            errorCorreo = null;
-                          }
+                          // ❌ ELIMINAMOS LA VALIDACIÓN DEL CORREO
 
                           final direccion = _direccionController.text.trim();
                           if (direccion.isEmpty) {
@@ -142,9 +143,8 @@ class _CartScreenState extends State<CartScreen> {
                           }
                         });
 
-                        if (errorCorreo != null || errorDireccion != null || errorTelefono != null) {
-                          return;
-                        }
+                        // Si hay errores de dirección o teléfono, no avanzamos
+                        if (errorDireccion != null || errorTelefono != null) return;
 
                         Navigator.pop(context);
 
@@ -152,17 +152,15 @@ class _CartScreenState extends State<CartScreen> {
                           context,
                           MaterialPageRoute(
                             builder: (context) => PaymentScreen(
-                              correo: _correoController.text.trim(),
+                              // MANDAMOS UN CORREO TEMPORAL (LUEGO LO SACAREMOS DEL PERFIL REAL)
+                              correo: 'usuario@hubmoda.com', 
                               direccion: _direccionController.text.trim(),
                               telefono: _telefonoController.text.trim(),
                             ),
                           ),
                         );
                       },
-                      child: const Text(
-                        'CONTINUAR AL PAGO',
-                        style: TextStyle(fontWeight: FontWeight.bold),
-                      ),
+                      child: const Text('CONTINUAR AL PAGO', style: TextStyle(fontWeight: FontWeight.bold)),
                     ),
                   ),
                   const SizedBox(height: 24),
@@ -213,10 +211,17 @@ class _CartScreenState extends State<CartScreen> {
                           alignment: Alignment.centerRight,
                           padding: const EdgeInsets.only(right: 20),
                           margin: const EdgeInsets.only(bottom: 16),
-                          child: const Icon(Icons.delete_outline, color: Colors.white, size: 28),
+                          child: const Icon(
+                            Icons.delete_outline,
+                            color: Colors.white,
+                            size: 28,
+                          ),
                         ),
                         onDismissed: (direction) {
-                          Provider.of<CartProvider>(context, listen: false).eliminarDelCarrito(item.id);
+                          Provider.of<CartProvider>(
+                            context,
+                            listen: false,
+                          ).eliminarDelCarrito(item.id);
                         },
                         child: Container(
                           margin: const EdgeInsets.only(bottom: 16),
@@ -247,41 +252,62 @@ class _CartScreenState extends State<CartScreen> {
                                   children: [
                                     Text(
                                       item.nombre,
-                                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 16,
+                                      ),
                                       maxLines: 1,
                                       overflow: TextOverflow.ellipsis,
                                     ),
                                     const SizedBox(height: 4),
                                     Text(
                                       'Talla: ${item.talla}',
-                                      style: const TextStyle(color: Colors.black54, fontWeight: FontWeight.w600),
+                                      style: const TextStyle(
+                                        color: Colors.black54,
+                                        fontWeight: FontWeight.w600,
+                                      ),
                                     ),
                                     const SizedBox(height: 4),
                                     Text(
                                       '\$${item.precio}',
-                                      style: const TextStyle(fontWeight: FontWeight.bold),
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                      ),
                                     ),
                                   ],
                                 ),
                               ),
                               Container(
                                 decoration: BoxDecoration(
-                                  border: Border.all(color: Colors.grey.shade300),
+                                  border: Border.all(
+                                    color: Colors.grey.shade300,
+                                  ),
                                   borderRadius: BorderRadius.circular(20),
                                 ),
                                 child: Row(
                                   children: [
                                     IconButton(
                                       icon: const Icon(Icons.remove, size: 16),
-                                      onPressed: () => Provider.of<CartProvider>(context, listen: false).restarCantidad(item.id),
+                                      onPressed: () =>
+                                          Provider.of<CartProvider>(
+                                            context,
+                                            listen: false,
+                                          ).restarCantidad(item.id),
                                     ),
                                     Text(
                                       '${item.cantidad}',
-                                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 16,
+                                      ),
                                     ),
                                     IconButton(
                                       icon: const Icon(Icons.add, size: 16),
-                                      onPressed: () => Provider.of<CartProvider>(context, listen: false).sumarCantidad(item.id),
+                                      onPressed: () =>
+                                          Provider.of<CartProvider>(
+                                            context,
+                                            listen: false,
+                                          ).sumarCantidad(item.id),
                                     ),
                                   ],
                                 ),
@@ -306,24 +332,59 @@ class _CartScreenState extends State<CartScreen> {
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            const Text('Subtotal', style: TextStyle(color: Colors.black54, fontWeight: FontWeight.w600)),
-                            Text('\$${carrito.subtotal.toStringAsFixed(2)}', style: const TextStyle(fontWeight: FontWeight.bold)),
+                            const Text(
+                              'Subtotal',
+                              style: TextStyle(
+                                color: Colors.black54,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            Text(
+                              '\$${carrito.subtotal.toStringAsFixed(2)}',
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
                           ],
                         ),
                         const SizedBox(height: 8),
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            const Text('IVA (15%)', style: TextStyle(color: Colors.black54, fontWeight: FontWeight.w600)),
-                            Text('\$${carrito.impuestosIva.toStringAsFixed(2)}', style: const TextStyle(fontWeight: FontWeight.bold)),
+                            const Text(
+                              'IVA (15%)',
+                              style: TextStyle(
+                                color: Colors.black54,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            Text(
+                              '\$${carrito.impuestosIva.toStringAsFixed(2)}',
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
                           ],
                         ),
                         const Divider(height: 24, thickness: 1),
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            const Text('TOTAL', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.black)),
-                            Text('\$${carrito.totalFinal.toStringAsFixed(2)}', style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w900)),
+                            const Text(
+                              'TOTAL',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.black,
+                              ),
+                            ),
+                            Text(
+                              '\$${carrito.totalFinal.toStringAsFixed(2)}',
+                              style: const TextStyle(
+                                fontSize: 28,
+                                fontWeight: FontWeight.w900,
+                              ),
+                            ),
                           ],
                         ),
                         const SizedBox(height: 20),
@@ -336,7 +397,9 @@ class _CartScreenState extends State<CartScreen> {
                               backgroundColor: Colors.black,
                               foregroundColor: Colors.white,
                             ),
-                            onPressed: () => _mostrarFormularioEnvio(carrito), // Directo al modal bro
+                            onPressed: () => _verificarSesionYProceder(
+                              carrito,
+                            ), // Directo al modal bro
                             child: const Text(
                               'PROCEDER AL PAGO',
                               style: TextStyle(fontWeight: FontWeight.bold),
