@@ -27,5 +27,18 @@ router.get(
   auth.verificarToken,
   pedidoController.obtenerMisPedidos
 );
-
+// --- NUEVA RUTA ADMIN: VER TODOS LOS PEDIDOS ---
+router.get(
+  "/admin/todos",
+  auth.verificarToken, 
+  auth.verificarAdmin, // <-- ¡Nadie que no sea admin pasa de aquí!
+  pedidoController.obtenerTodosLosPedidos
+);
+// --- NUEVA RUTA ADMIN: ACTUALIZAR ESTADO DEL PEDIDO ---
+router.put(
+  "/admin/:id/estado",
+  auth.verificarToken,
+  auth.verificarAdmin, // <-- ¡Blindaje activo!
+  pedidoController.actualizarEstadoPedido
+);
 module.exports = router;

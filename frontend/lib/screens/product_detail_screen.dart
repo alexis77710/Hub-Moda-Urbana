@@ -3,6 +3,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../services/cart_provider.dart';
+
 // 1. Evolucionamos a StatefulWidget para poder guardar la talla seleccionada
 class ProductDetailScreen extends StatefulWidget {
   final dynamic producto;
@@ -22,10 +23,10 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   Widget build(BuildContext context) {
     // 3. OJO AQUÍ: Como ahora es StatefulWidget, para leer la info usamos "widget.producto"
     String urlImagen = 'https://via.placeholder.com/400';
-    
+
     // RECUERDA PONER AQUÍ EL NOMBRE REAL DE TU CAMPO EN LA BASE DE DATOS
-    var campoImagen = widget.producto['imagenes']; 
-    
+    var campoImagen = widget.producto['imagenes'];
+
     if (campoImagen != null) {
       if (campoImagen is List && campoImagen.isNotEmpty) {
         urlImagen = campoImagen[0].toString();
@@ -55,32 +56,44 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                 ),
               ),
             ),
-            
+
             Padding(
               padding: const EdgeInsets.all(24.0),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    widget.producto['nombre'] ?? 'Sin nombre',
+                    widget
+                        .producto['nombre'], // (O como tengas tu variable del título)
                     style: const TextStyle(
-                      fontSize: 28, 
-                      fontWeight: FontWeight.w900, 
-                      letterSpacing: -1.0,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    '\$${widget.producto['precio']?.toString() ?? '0.00'}',
-                    style: const TextStyle(
-                      fontSize: 22, 
-                      color: Colors.black54, 
+                      fontSize: 24,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
-                  
+                  const SizedBox(height: 5),
+
+                  // --- EL PARCHE MULTIMARCA ---
+                  Row(
+                    children: [
+                      const Icon(
+                        Icons.storefront,
+                        size: 16,
+                        color: Colors.blueGrey,
+                      ),
+                      const SizedBox(width: 5),
+                      Text(
+                        'Vendido por: ${widget.producto['marcaNombre'] ?? 'Hub Moda'}',
+                        style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.blueGrey,
+                        ),
+                      ),
+                    ],
+                  ),
+
                   const SizedBox(height: 25),
-                  
+
                   // --- NUEVA SECCIÓN: SELECTOR DE TALLAS ---
                   const Text(
                     'SELECCIONA UNA TALLA',
@@ -91,13 +104,13 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                     ),
                   ),
                   const SizedBox(height: 12),
-                  
+
                   // Wrap nos permite poner los botones uno al lado del otro
                   Wrap(
                     spacing: 12, // Espacio horizontal entre botones
                     children: _tallasDisponibles.map((talla) {
                       final bool estaSeleccionada = _tallaSeleccionada == talla;
-                      
+
                       return GestureDetector(
                         onTap: () {
                           // setState actualiza la pantalla al tocar
@@ -112,38 +125,46 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                           alignment: Alignment.center,
                           decoration: BoxDecoration(
                             // Estética brutalista: fondo negro si está seleccionado, blanco si no
-                            color: estaSeleccionada ? Colors.black : Colors.white,
+                            color: estaSeleccionada
+                                ? Colors.black
+                                : Colors.white,
                             border: Border.all(
-                              color: estaSeleccionada ? Colors.black : Colors.grey.shade300,
+                              color: estaSeleccionada
+                                  ? Colors.black
+                                  : Colors.grey.shade300,
                               width: 2,
                             ),
                             // Bordes completamente cuadrados
-                            borderRadius: BorderRadius.zero, 
+                            borderRadius: BorderRadius.zero,
                           ),
                           child: Text(
                             talla,
                             style: TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.bold,
-                              color: estaSeleccionada ? Colors.white : Colors.black,
+                              color: estaSeleccionada
+                                  ? Colors.white
+                                  : Colors.black,
                             ),
                           ),
                         ),
                       );
                     }).toList(),
                   ),
-                  // -----------------------------------------
 
-                  const SizedBox(height: 35), 
-                  
+                  // -----------------------------------------
+                  const SizedBox(height: 35),
+
                   SizedBox(
-                    width: double.infinity, 
+                    width: double.infinity,
                     child: ElevatedButton(
                       onPressed: () {
                         if (_tallaSeleccionada == null) {
                           ScaffoldMessenger.of(context).showSnackBar(
                             const SnackBar(
-                              content: Text('⚠️ Bro, selecciona una talla primero'),
+                              content: Text(
+                                '⚠️ Bro, selecciona una talla primero',
+                              ),
                               backgroundColor: Colors.orange,
                               behavior: SnackBarBehavior.floating,
                             ),
@@ -159,25 +180,27 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                           urlImagen,
                         );
                         // ----------------------------
-                        
+
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(
-                            content: Text('¡Añadido talla $_tallaSeleccionada al carrito! 🛍️'),
+                            content: Text(
+                              '¡Añadido talla $_tallaSeleccionada al carrito! 🛍️',
+                            ),
                             backgroundColor: Colors.green,
                             behavior: SnackBarBehavior.floating,
                             duration: const Duration(seconds: 2),
                           ),
                         );
-                        
+
                         // Opcional: Regresamos a la tienda automáticamente después de añadir
-                        Navigator.pop(context); 
+                        Navigator.pop(context);
                       },
                       child: const Text('AÑADIR AL CARRITO'),
                     ),
                   ),
                 ],
               ),
-            )
+            ),
           ],
         ),
       ),

@@ -1,4 +1,7 @@
 // Archivo: models/Marca.js
+// aquí definimos el modelo de Marca, que representa a las marcas que se registran en el Hub.
+// Este modelo se conecta con la base de datos MongoDB a través de Mongoose y define los campos que tendrá cada marca, 
+// como el nombre, el RUC, la identificación, el Instagram, el correo, la contraseña y el estado de aprobación.
 const mongoose = require("mongoose");
 
 const MarcaSchema = mongoose.Schema({

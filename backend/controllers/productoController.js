@@ -7,19 +7,34 @@ const Marca = require("../models/Marca");
 // Función para agregar un producto nuevo
 exports.crearProducto = async (req, res) => {
   try {
-    // Magia pura: Si Multer y Cloudinary hicieron su trabajo,
-    // el link de la imagen en la nube estará guardado en req.file.path
-    if (req.file) {
-      req.body.imagenes = [req.file.path];
+    // 1. Buscamos a la Marca que está subiendo la ropa (usando su token)
+    const Usuario = require('../models/Usuario');
+    const marcaLogueada = await Usuario.findById(req.usuario.id);
+
+    if (!marcaLogueada) {
+      return res.status(404).json({ msg: 'No se encontró tu usuario de marca bro' });
     }
-// Creamos un nuevo producto con los datos que vienen en el body de la petición
-    let producto = new Producto(req.body);
+
+    // 2. Extraemos los datos que mandó Flutter en el formulario
+    const datosProducto = { ...req.body };
+
+    // 3. Magia pura: Atrapamos la foto de Cloudinary
+    if (req.file) {
+      datosProducto.imagenes = [req.file.path];
+    }
+
+    // 4. Inyectamos la firma inborrable de la marca
+    datosProducto.marcaNombre = marcaLogueada.nombre;
+    datosProducto.marcaId = marcaLogueada._id;
+
+    // 5. Guardamos en MongoDB
+    let producto = new Producto(datosProducto);
     await producto.save();
-// Respondemos con el producto que se acaba de crear para que el frontend lo muestre
+
     res.status(201).json(producto);
   } catch (error) {
     console.log("Error al crear producto:", error);
-    res.status(500).send("Hubo un error en el servidor bro");
+    res.status(500).json({ msg: "Hubo un error en el servidor al subir la prenda" });
   }
 };
 

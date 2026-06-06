@@ -6,7 +6,7 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:jwt_decoder/jwt_decoder.dart'; 
-
+import 'dart:typed_data'; // <-- PARA MANEJAR LOS BYTES DE LA IMAGEN EN EL PERFIL
 class AuthService {
   final String _urlLogin = 'http://localhost:4000/api/auth/login';
   final String _urlRegistro = 'http://localhost:4000/api/auth/registrar';
@@ -100,5 +100,83 @@ class AuthService {
   Future<String?> obtenerRolGuardado() async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
     return prefs.getString('user_rol');
+  }
+  
+
+  // --- NUEVA FUNCIÓN: OBTENER LOS DATOS REALES DEL PERFIL ---
+  Future<Map<String, dynamic>> obtenerDatosPerfil() async {
+    final String urlPerfil = 'http://localhost:4000/api/auth/perfil';
+    
+    try {
+      SharedPreferences prefs = await SharedPreferences.getInstance();
+      String? token = prefs.getString('jwt_token');
+
+      if (token == null) throw 'No tienes sesión activa bro';
+
+      final response = await http.get(
+        Uri.parse(urlPerfil),
+        headers: {
+          'Content-Type': 'application/json',
+          'x-auth-token': token, // ¡Mandamos el Pase VIP al guardia de Node!
+        },
+      );
+
+      final data = jsonDecode(response.body);
+
+      if (response.statusCode == 200) {
+        return data; // Retornamos el JSON con {nombre, email, rol, etc}
+      } else {
+        throw data['msg'] ?? 'Error al obtener tu perfil';
+      }
+    } catch (e) {
+      if (e is String) throw e;
+      throw 'Error de conexión con el servidor 😅';
+    }
+  }
+
+  // --- NUEVA FUNCIÓN: ACTUALIZAR PERFIL (FOTO Y NOMBRE) ---
+  Future<void> actualizarPerfil({String? nombre, Uint8List? fotoBytes, String? nombreArchivo}) async {
+    final String urlActualizar = 'http://localhost:4000/api/auth/perfil';
+    
+    try {
+      SharedPreferences prefs = await SharedPreferences.getInstance();
+      String? token = prefs.getString('jwt_token');
+
+      if (token == null) throw 'No tienes sesión activa bro';
+
+      var request = http.MultipartRequest('PUT', Uri.parse(urlActualizar));
+      
+      // Le mandamos tu Pase VIP al guardia
+      request.headers['x-auth-token'] = token;
+
+      // Si escribiste un nombre nuevo, lo metemos al formulario
+      if (nombre != null && nombre.isNotEmpty) {
+        request.fields['nombre'] = nombre;
+      }
+
+      // Si elegiste una foto nueva, la adjuntamos
+      if (fotoBytes != null && nombreArchivo != null) {
+        var multipartFile = http.MultipartFile.fromBytes(
+          'fotoPerfil', // <-- ¡TIENE QUE LLAMARSE ASÍ PARA QUE MULTER LO ATRAPE!
+          fotoBytes,
+          filename: nombreArchivo,
+        );
+        request.files.add(multipartFile);
+      }
+
+      // Disparamos el misil a Node.js
+      var response = await request.send();
+      
+      if (response.statusCode == 200) {
+        return; // ¡Éxito bro!
+      } else {
+        final responseData = await http.Response.fromStream(response);
+        final data = jsonDecode(responseData.body);
+        throw data['msg'] ?? 'Error al actualizar perfil';
+      }
+    } catch (e) {
+      if (e is String) throw e;
+      throw 'Error de conexión bro 😅';
+    }
   }
 }

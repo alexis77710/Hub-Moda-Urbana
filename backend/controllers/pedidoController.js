@@ -1,3 +1,4 @@
+// controllers/pedidoController.js
 // Aquí vamos a manejar todo lo relacionado con los pedidos, 
 // como crear un nuevo pedido o mostrar los pedidos de un cliente específico
 
@@ -73,11 +74,66 @@ exports.crearPedido = async (req, res) => {
 }
 
 exports.obtenerMisPedidos = async (req, res) => {
-    try {
-        const pedidos = await Pedido.find({ cliente: req.usuario.id });
-        res.json(pedidos);
-    } catch (error) {
-        console.log('Error al obtener pedidos:', error);
-        res.status(500).send('Hubo un error al buscar tus compras');
+  try {
+    // 1. Buscamos el correo real del usuario logueado usando su ID del token
+    const Usuario = require("../models/Usuario"); 
+    const usuarioLogueado = await Usuario.findById(req.usuario.id);
+
+    if (!usuarioLogueado) {
+      return res.status(404).json({ msg: "Usuario no encontrado bro 🛑" });
     }
-}
+
+    // 2. Buscamos todos los pedidos donde el correoComprador sea igual al del usuario
+    const pedidos = await Pedido.find({ correoComprador: usuarioLogueado.email }).sort({ fechaCreacion: -1 });
+    
+    res.json(pedidos);
+  } catch (error) {
+    console.error("Error al obtener mis pedidos:", error);
+    res.status(500).json({ msg: "Hubo un error al buscar tus compras" });
+  }
+};
+
+// --- FUNCIÓN (ADMIN): VER ABSOLUTAMENTE TODOS LOS PEDIDOS ---
+exports.obtenerTodosLosPedidos = async (req, res) => {
+  try {
+    const pedidos = await Pedido.find()
+      // MAGIA NIVEL DIOS: Traemos la ropa Y TAMBIÉN los datos del dueño de la marca
+      .populate({
+        path: 'productos.producto',
+        select: 'nombre marcaNombre precio marcaId',
+        populate: {
+          path: 'marcaId', // Viajamos al modelo de Usuario
+          select: 'email' // Traemos el correo para contactarlos/pagarles por PayPal (o transferencia)
+        }
+      })
+      .sort({ fechaCreacion: -1 });
+      
+    res.json(pedidos);
+  } catch (error) {
+    console.error("Error al obtener todos los pedidos:", error);
+    res.status(500).json({ msg: "Hubo un error al cargar el panel bro" });
+  }
+};
+
+// --- NUEVA FUNCIÓN (ADMIN): ACTUALIZAR EL ESTADO DEL PEDIDO ---
+exports.actualizarEstadoPedido = async (req, res) => {
+  try {
+    const { estado } = req.body; // Recibiremos "Aprobado", "Rechazado", etc.
+    const pedidoId = req.params.id; // El ID viaja en la URL
+
+    const pedidoActualizado = await Pedido.findByIdAndUpdate(
+      pedidoId,
+      { estado: estado },
+      { new: true }
+    );
+
+    if (!pedidoActualizado) {
+      return res.status(404).json({ msg: "Pedido no encontrado bro 🛑" });
+    }
+
+    res.json({ msg: `¡Pedido ${estado} con éxito! 🔥`, pedido: pedidoActualizado });
+  } catch (error) {
+    console.error("Error al actualizar estado:", error);
+    res.status(500).json({ msg: "Hubo un error al actualizar el pedido" });
+  }
+};

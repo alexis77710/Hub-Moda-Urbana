@@ -7,7 +7,7 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'dart:typed_data'; // <-- MAGIA PURA: Compatible con Web y Celular
 import '../services/cart_provider.dart';
-
+import 'package:shared_preferences/shared_preferences.dart';
 class OrderService {
   final String _url = 'http://localhost:4000/api/pedidos';
 
@@ -72,4 +72,39 @@ class OrderService {
       throw 'Error de conexión con el Hub bro 😅';
     }
   }
-}
+
+  
+// --- FUNCIÓN 2: OBTENER EL HISTORIAL DE COMPRAS ---
+  // ¡Ahora sí está ADENTRO de la clase OrderService!
+  Future<List<dynamic>> obtenerHistorialPedidos() async {
+    final String urlHistorial = 'http://localhost:4000/api/pedidos/mis-pedidos';
+    
+    try {
+      SharedPreferences prefs = await SharedPreferences.getInstance();
+      String? token = prefs.getString('jwt_token');
+
+      if (token == null) throw 'No tienes sesión activa bro';
+
+      final response = await http.get(
+        Uri.parse(urlHistorial),
+        headers: {
+          'Content-Type': 'application/json',
+          'x-auth-token': token, 
+        },
+      );
+
+      final data = jsonDecode(response.body);
+
+      if (response.statusCode == 200) {
+        return data; 
+      } else {
+        throw data['msg'] ?? 'Error al obtener tu historial';
+      }
+    } catch (e) {
+      if (e is String) throw e;
+      throw 'Error de conexión con el Hub bro 😅';
+    }
+  }
+
+
+  }

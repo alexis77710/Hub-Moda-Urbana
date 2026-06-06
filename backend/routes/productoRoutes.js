@@ -1,3 +1,4 @@
+// Archivo: backend/routes/productoRoutes.js
 //Aquí conectamos la URL con la función del controlador
 // Este archivo tambien define las rutas para los productos. 
 // Aquí es donde decimos que cuando llegue una petición POST a /api/productos, 

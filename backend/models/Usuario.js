@@ -26,7 +26,12 @@ const UsuarioSchema = mongoose.Schema({
     fechaRegistro: {
         type: Date,
         default: Date.now
-    }
+    },
+    
+    fotoUrl: {
+    type: String,
+    default: "" // Por defecto vacío hasta que suban una foto
+  },
 });
 
 module.exports = mongoose.model('Usuario', UsuarioSchema);

@@ -1,11 +1,14 @@
 // Archivo: lib/screens/cart_screen.dart
+// Esta pantalla muestra el contenido del carrito, permite modificar cantidades, eliminar productos y proceder al pago.
+// Aquí es donde el usuario hace clic en "Proceder al Pago" y se le pide la dirección y teléfono antes de ir a la pantalla de pago.
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../services/cart_provider.dart';
-import 'package:flutter/services.dart';
-import 'payment_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'login_screen.dart'; // Importamos tu pantalla de login
+import 'package:flutter/services.dart';
+import '../services/cart_provider.dart';
+import '../services/auth_service.dart'; // <-- IMPORTAMOS EL SERVICIO
+import 'payment_screen.dart';
+import 'login_screen.dart';
 
 class CartScreen extends StatefulWidget {
   const CartScreen({super.key});
@@ -15,39 +18,55 @@ class CartScreen extends StatefulWidget {
 }
 
 class _CartScreenState extends State<CartScreen> {
-  // Limpiecito: Ya no necesitamos _orderService ni _estaProcesando aquí bro ✨
-
   final TextEditingController _direccionController = TextEditingController();
   final TextEditingController _telefonoController = TextEditingController();
+  
+  final AuthService _authService = AuthService(); // <-- INSTANCIAMOS EL SERVICIO
 
-  // --- NUEVO: EL CANDADO DE SEGURIDAD ---
+  // --- CANDADO MEJORADO: AHORA SACA EL CORREO REAL ---
   Future<void> _verificarSesionYProceder(CartProvider carrito) async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
     String? token = prefs.getString('jwt_token');
 
     if (token == null || token.isEmpty) {
-      // ❌ NO ESTÁ LOGUEADO: Lo mandamos al Login
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Bro, inicia sesión o regístrate para comprar 🛑'),
           backgroundColor: Colors.orange,
-          duration: Duration(seconds: 3),
         ),
       );
-
-      Navigator.push(
-        context,
-        MaterialPageRoute(builder: (context) => const LoginScreen()),
-      );
+      Navigator.push(context, MaterialPageRoute(builder: (context) => const LoginScreen()));
     } else {
-      // ✅ SÍ ESTÁ LOGUEADO: Le abrimos el Modal de envío
-      _mostrarFormularioEnvio(carrito);
+      // 1. Ponemos un mini circulito de carga mientras Node.js nos da el correo
+      showDialog(
+        context: context, 
+        barrierDismissible: false,
+        builder: (_) => const Center(child: CircularProgressIndicator(color: Colors.white)),
+      );
+
+      try {
+        // 2. Pedimos tus datos reales a la base de datos
+        final datosPerfil = await _authService.obtenerDatosPerfil();
+        final String correoReal = datosPerfil['email']; 
+
+        if (!mounted) return;
+        Navigator.pop(context); // Quitamos el circulito de carga
+
+        // 3. Abrimos el formulario de envío, pero ahora le pasamos tu correo real
+        _mostrarFormularioEnvio(carrito, correoReal);
+      } catch (error) {
+        if (!mounted) return;
+        Navigator.pop(context); // Quitamos el circulito
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error al leer tu perfil: $error'), backgroundColor: Colors.red),
+        );
+      }
     }
   }
 
- void _mostrarFormularioEnvio(CartProvider carrito) {
-    // ❌ Adiós _correoController.clear();
+  // Fíjate que ahora la función recibe el correo real como parámetro
+  void _mostrarFormularioEnvio(CartProvider carrito, String correoReal) {
     _direccionController.clear();
     _telefonoController.clear();
 
@@ -55,11 +74,8 @@ class _CartScreenState extends State<CartScreen> {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
       builder: (context) {
-        // ❌ Adiós String? errorCorreo;
         String? errorDireccion;
         String? errorTelefono;
 
@@ -74,13 +90,8 @@ class _CartScreenState extends State<CartScreen> {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
-                    '¿A DÓNDE LO ENVIAMOS? 📦',
-                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900, letterSpacing: -0.5),
-                  ),
+                  const Text('¿A DÓNDE LO ENVIAMOS? 📦', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900, letterSpacing: -0.5)),
                   const SizedBox(height: 20),
-
-                  // ❌ ELIMINAMOS EL TEXTFIELD DEL CORREO COMPLETAMENTE
 
                   TextField(
                     controller: _direccionController,
@@ -114,14 +125,9 @@ class _CartScreenState extends State<CartScreen> {
                     width: double.infinity,
                     height: 50,
                     child: ElevatedButton(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.black,
-                        foregroundColor: Colors.white,
-                      ),
+                      style: ElevatedButton.styleFrom(backgroundColor: Colors.black, foregroundColor: Colors.white),
                       onPressed: () {
                         setModalState(() {
-                          // ❌ ELIMINAMOS LA VALIDACIÓN DEL CORREO
-
                           final direccion = _direccionController.text.trim();
                           if (direccion.isEmpty) {
                             errorDireccion = 'Bro, rellena la ubicación';
@@ -143,17 +149,16 @@ class _CartScreenState extends State<CartScreen> {
                           }
                         });
 
-                        // Si hay errores de dirección o teléfono, no avanzamos
                         if (errorDireccion != null || errorTelefono != null) return;
 
                         Navigator.pop(context);
 
+                        // ¡AQUÍ ENVIAMOS EL CORREO REAL A LA PANTALLA DE PAGO!
                         Navigator.push(
                           context,
                           MaterialPageRoute(
                             builder: (context) => PaymentScreen(
-                              // MANDAMOS UN CORREO TEMPORAL (LUEGO LO SACAREMOS DEL PERFIL REAL)
-                              correo: 'usuario@hubmoda.com', 
+                              correo: correoReal, // <-- ¡LA MAGIA!
                               direccion: _direccionController.text.trim(),
                               telefono: _telefonoController.text.trim(),
                             ),
@@ -179,10 +184,7 @@ class _CartScreenState extends State<CartScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text(
-          'TU BOLSITA 🛍️',
-          style: TextStyle(fontWeight: FontWeight.w900, letterSpacing: -1.0),
-        ),
+        title: const Text('TU BOLSITA 🛍️', style: TextStyle(fontWeight: FontWeight.w900, letterSpacing: -1.0)),
         centerTitle: true,
         backgroundColor: Colors.transparent,
         elevation: 0,
@@ -190,10 +192,7 @@ class _CartScreenState extends State<CartScreen> {
       ),
       body: carrito.items.isEmpty
           ? const Center(
-              child: Text(
-                'Tu carrito está más vacío que mi billetera bro 💨',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-              ),
+              child: Text('Tu carrito está más vacío que mi billetera bro 💨', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
             )
           : Column(
               children: [
@@ -211,17 +210,10 @@ class _CartScreenState extends State<CartScreen> {
                           alignment: Alignment.centerRight,
                           padding: const EdgeInsets.only(right: 20),
                           margin: const EdgeInsets.only(bottom: 16),
-                          child: const Icon(
-                            Icons.delete_outline,
-                            color: Colors.white,
-                            size: 28,
-                          ),
+                          child: const Icon(Icons.delete_outline, color: Colors.white, size: 28),
                         ),
                         onDismissed: (direction) {
-                          Provider.of<CartProvider>(
-                            context,
-                            listen: false,
-                          ).eliminarDelCarrito(item.id);
+                          Provider.of<CartProvider>(context, listen: false).eliminarDelCarrito(item.id);
                         },
                         child: Container(
                           margin: const EdgeInsets.only(bottom: 16),
@@ -239,10 +231,7 @@ class _CartScreenState extends State<CartScreen> {
                                 decoration: BoxDecoration(
                                   color: Colors.grey[200],
                                   borderRadius: BorderRadius.circular(8),
-                                  image: DecorationImage(
-                                    image: NetworkImage(item.imagen),
-                                    fit: BoxFit.cover,
-                                  ),
+                                  image: DecorationImage(image: NetworkImage(item.imagen), fit: BoxFit.cover),
                                 ),
                               ),
                               const SizedBox(width: 16),
@@ -250,64 +239,26 @@ class _CartScreenState extends State<CartScreen> {
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    Text(
-                                      item.nombre,
-                                      style: const TextStyle(
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 16,
-                                      ),
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
+                                    Text(item.nombre, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16), maxLines: 1, overflow: TextOverflow.ellipsis),
                                     const SizedBox(height: 4),
-                                    Text(
-                                      'Talla: ${item.talla}',
-                                      style: const TextStyle(
-                                        color: Colors.black54,
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                    ),
+                                    Text('Talla: ${item.talla}', style: const TextStyle(color: Colors.black54, fontWeight: FontWeight.w600)),
                                     const SizedBox(height: 4),
-                                    Text(
-                                      '\$${item.precio}',
-                                      style: const TextStyle(
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
+                                    Text('\$${item.precio}', style: const TextStyle(fontWeight: FontWeight.bold)),
                                   ],
                                 ),
                               ),
                               Container(
-                                decoration: BoxDecoration(
-                                  border: Border.all(
-                                    color: Colors.grey.shade300,
-                                  ),
-                                  borderRadius: BorderRadius.circular(20),
-                                ),
+                                decoration: BoxDecoration(border: Border.all(color: Colors.grey.shade300), borderRadius: BorderRadius.circular(20)),
                                 child: Row(
                                   children: [
                                     IconButton(
                                       icon: const Icon(Icons.remove, size: 16),
-                                      onPressed: () =>
-                                          Provider.of<CartProvider>(
-                                            context,
-                                            listen: false,
-                                          ).restarCantidad(item.id),
+                                      onPressed: () => Provider.of<CartProvider>(context, listen: false).restarCantidad(item.id),
                                     ),
-                                    Text(
-                                      '${item.cantidad}',
-                                      style: const TextStyle(
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 16,
-                                      ),
-                                    ),
+                                    Text('${item.cantidad}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
                                     IconButton(
                                       icon: const Icon(Icons.add, size: 16),
-                                      onPressed: () =>
-                                          Provider.of<CartProvider>(
-                                            context,
-                                            listen: false,
-                                          ).sumarCantidad(item.id),
+                                      onPressed: () => Provider.of<CartProvider>(context, listen: false).sumarCantidad(item.id),
                                     ),
                                   ],
                                 ),
@@ -319,91 +270,43 @@ class _CartScreenState extends State<CartScreen> {
                     },
                   ),
                 ),
-
                 Container(
                   padding: const EdgeInsets.all(24),
-                  decoration: const BoxDecoration(
-                    color: Colors.white,
-                    border: Border(top: BorderSide(color: Colors.black12)),
-                  ),
+                  decoration: const BoxDecoration(color: Colors.white, border: Border(top: BorderSide(color: Colors.black12))),
                   child: SafeArea(
                     child: Column(
                       children: [
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            const Text(
-                              'Subtotal',
-                              style: TextStyle(
-                                color: Colors.black54,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                            Text(
-                              '\$${carrito.subtotal.toStringAsFixed(2)}',
-                              style: const TextStyle(
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
+                            const Text('Subtotal', style: TextStyle(color: Colors.black54, fontWeight: FontWeight.w600)),
+                            Text('\$${carrito.subtotal.toStringAsFixed(2)}', style: const TextStyle(fontWeight: FontWeight.bold)),
                           ],
                         ),
                         const SizedBox(height: 8),
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            const Text(
-                              'IVA (15%)',
-                              style: TextStyle(
-                                color: Colors.black54,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                            Text(
-                              '\$${carrito.impuestosIva.toStringAsFixed(2)}',
-                              style: const TextStyle(
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
+                            const Text('IVA (15%)', style: TextStyle(color: Colors.black54, fontWeight: FontWeight.w600)),
+                            Text('\$${carrito.impuestosIva.toStringAsFixed(2)}', style: const TextStyle(fontWeight: FontWeight.bold)),
                           ],
                         ),
                         const Divider(height: 24, thickness: 1),
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            const Text(
-                              'TOTAL',
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.black,
-                              ),
-                            ),
-                            Text(
-                              '\$${carrito.totalFinal.toStringAsFixed(2)}',
-                              style: const TextStyle(
-                                fontSize: 28,
-                                fontWeight: FontWeight.w900,
-                              ),
-                            ),
+                            const Text('TOTAL', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.black)),
+                            Text('\$${carrito.totalFinal.toStringAsFixed(2)}', style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w900)),
                           ],
                         ),
                         const SizedBox(height: 20),
-                        // --- AQUÍ EL BOTÓN YA LIMPIO SANO Y DIRECTO ---
                         SizedBox(
                           width: double.infinity,
                           height: 50,
                           child: ElevatedButton(
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.black,
-                              foregroundColor: Colors.white,
-                            ),
-                            onPressed: () => _verificarSesionYProceder(
-                              carrito,
-                            ), // Directo al modal bro
-                            child: const Text(
-                              'PROCEDER AL PAGO',
-                              style: TextStyle(fontWeight: FontWeight.bold),
-                            ),
+                            style: ElevatedButton.styleFrom(backgroundColor: Colors.black, foregroundColor: Colors.white),
+                            onPressed: () => _verificarSesionYProceder(carrito),
+                            child: const Text('PROCEDER AL PAGO', style: TextStyle(fontWeight: FontWeight.bold)),
                           ),
                         ),
                       ],

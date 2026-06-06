@@ -198,3 +198,56 @@ exports.loginUsuario = async (req, res) => {
     res.status(500).send("Hubo un error al iniciar sesión");
   }
 };
+
+// --- NUEVA FUNCIÓN: OBTENER PERFIL DEL USUARIO LOGUEADO ---
+exports.obtenerPerfilUsuario = async (req, res) => {
+  try {
+    // El middleware de autenticación (auth.js) ya nos dejó el ID seguro en req.usuario.id
+    // El .select('-password') es vital para que la contraseña encriptada no viaje al frontend
+    const usuario = await Usuario.findById(req.usuario.id).select('-password');
+    
+    if (!usuario) {
+      return res.status(404).json({ msg: "Usuario no encontrado bro" });
+    }
+    
+    res.json(usuario);
+  } catch (error) {
+    console.error("Error al obtener perfil:", error);
+    res.status(500).send("Hubo un error en el servidor al buscar tu perfil");
+  }
+};
+
+// --- NUEVA FUNCIÓN: ACTUALIZAR PERFIL (NOMBRE Y FOTO) ---
+exports.actualizarPerfil = async (req, res) => {
+  try {
+    const { nombre } = req.body;
+    const actualizaciones = {};
+
+    // 1. Si el usuario mandó un nombre nuevo, lo preparamos para actualizar
+    if (nombre) {
+      // Opcional: Verificar que el nuevo nombre no esté tomado por otro (como hicimos en el registro)
+      const usernameRepetido = await Usuario.findOne({ nombre: new RegExp(`^${nombre}$`, 'i'), _id: { $ne: req.usuario.id } });
+      if (usernameRepetido) {
+        return res.status(400).json({ msg: "Ese nombre ya está en uso bro 🛑" });
+      }
+      actualizaciones.nombre = nombre;
+    }
+
+    // 2. Si Multer atrapó una foto nueva, guardamos el link de Cloudinary
+    if (req.file) {
+      actualizaciones.fotoUrl = req.file.path;
+    }
+
+    // 3. Actualizamos en MongoDB y devolvemos el usuario actualizado (sin la contraseña)
+    const usuarioActualizado = await Usuario.findByIdAndUpdate(
+      req.usuario.id,
+      { $set: actualizaciones },
+      { new: true } // Esto le dice a Mongo que devuelva el documento YA modificado
+    ).select('-password');
+
+    res.json({ msg: "¡Perfil actualizado con éxito! 🔥", usuario: usuarioActualizado });
+  } catch (error) {
+    console.error("Error al actualizar perfil:", error);
+    res.status(500).json({ msg: "Hubo un error al guardar tus cambios bro" });
+  }
+};
